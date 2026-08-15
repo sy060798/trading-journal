@@ -1,7 +1,7 @@
 /* =========================================================
    TRADING JOURNAL
    trading.js
-   VERSION: FINAL UPDATE
+   VERSION: FINAL - PART 1
 ========================================================= */
 
 "use strict";
@@ -48,6 +48,8 @@ async function initializeTradingPage() {
 
   setupActionButtons();
 
+  setupProfitLossEvents();
+
   await loadTradingData();
 
 }
@@ -59,13 +61,41 @@ async function initializeTradingPage() {
 
 function setDefaultDate() {
 
-  const input =
-    document.getElementById("tanggal");
+  const inputs = [
 
-  if (!input) {
-    return;
-  }
+    "tanggal",
+    "addModalTanggal",
+    "withdrawModalTanggal"
 
+  ];
+
+
+  const today =
+    getTodayDate();
+
+
+  inputs.forEach(function (id) {
+
+    const input =
+      document.getElementById(id);
+
+    if (input && !input.value) {
+
+      input.value =
+        today;
+
+    }
+
+  });
+
+}
+
+
+/* =========================================================
+   TODAY DATE
+========================================================= */
+
+function getTodayDate() {
 
   const today =
     new Date();
@@ -87,8 +117,7 @@ function setDefaultDate() {
     ).padStart(2, "0");
 
 
-  input.value =
-    `${year}-${month}-${day}`;
+  return `${year}-${month}-${day}`;
 
 }
 
@@ -140,15 +169,19 @@ function setupFormEvents() {
 
 function setupActionButtons() {
 
-  const addCapitalButton =
+  /*
+   * TAMBAH MODAL
+   */
+
+  const addModalButton =
     document.getElementById(
-      "addCapitalButton"
+      "addModalButton"
     );
 
 
-  if (addCapitalButton) {
+  if (addModalButton) {
 
-    addCapitalButton.addEventListener(
+    addModalButton.addEventListener(
       "click",
       function () {
 
@@ -160,15 +193,19 @@ function setupActionButtons() {
   }
 
 
-  const withdrawButton =
+  /*
+   * TARIK MODAL
+   */
+
+  const withdrawModalButton =
     document.getElementById(
-      "withdrawCapitalButton"
+      "withdrawModalButton"
     );
 
 
-  if (withdrawButton) {
+  if (withdrawModalButton) {
 
-    withdrawButton.addEventListener(
+    withdrawModalButton.addEventListener(
       "click",
       function () {
 
@@ -179,6 +216,12 @@ function setupActionButtons() {
 
   }
 
+
+  /*
+   * REFRESH
+   * Tetap kompatibel jika nanti
+   * tombol refresh ditambahkan.
+   */
 
   const refreshButton =
     document.getElementById(
@@ -198,6 +241,84 @@ function setupActionButtons() {
     );
 
   }
+
+}
+
+
+/* =========================================================
+   PROFIT / LOSS EVENTS
+========================================================= */
+
+function setupProfitLossEvents() {
+
+  const select =
+    document.getElementById(
+      "profitRugi"
+    );
+
+
+  const nominal =
+    document.getElementById(
+      "nominal"
+    );
+
+
+  const nominalGroup =
+    document.getElementById(
+      "nominalGroup"
+    );
+
+
+  if (!select || !nominal) {
+    return;
+  }
+
+
+  function updateNominalState() {
+
+    const value =
+      select.value;
+
+
+    const active =
+      value === "PROFIT" ||
+      value === "RUGI";
+
+
+    nominal.disabled =
+      !active;
+
+
+    nominal.required =
+      active;
+
+
+    if (nominalGroup) {
+
+      nominalGroup.classList.toggle(
+        "disabled",
+        !active
+      );
+
+    }
+
+
+    if (!active) {
+
+      nominal.value = "";
+
+    }
+
+  }
+
+
+  select.addEventListener(
+    "change",
+    updateNominalState
+  );
+
+
+  updateNominalState();
 
 }
 
@@ -224,23 +345,12 @@ async function loadTradingData() {
 
   try {
 
-    /*
-     * Kita gunakan SATU request.
-     *
-     * Apps Script mengembalikan:
-     *
-     * {
-     *   success: true,
-     *   data: {
-     *      transaksi: [],
-     *      modal: [],
-     *      summary: {}
-     *   }
-     * }
-     */
-
     let result;
 
+
+    /*
+     * API utama
+     */
 
     if (
       window.TradingAPI &&
@@ -250,15 +360,17 @@ async function loadTradingData() {
       result =
         await window.TradingAPI.getAllData();
 
-    } else if (
+    }
+
+
+    /*
+     * Fallback API request
+     */
+
+    else if (
       window.TradingAPI &&
       typeof window.TradingAPI.request === "function"
     ) {
-
-      /*
-       * Fallback jika api.js belum menyediakan
-       * getAllData().
-       */
 
       const response =
         await window.TradingAPI.request(
@@ -271,7 +383,10 @@ async function loadTradingData() {
         response ||
         {};
 
-    } else {
+    }
+
+
+    else {
 
       throw new Error(
         "TradingAPI belum tersedia. Pastikan api.js dimuat sebelum trading.js."
@@ -296,6 +411,10 @@ async function loadTradingData() {
     }
 
 
+    /*
+     * TRANSAKSI
+     */
+
     transactions =
       Array.isArray(
         result?.transaksi
@@ -304,18 +423,21 @@ async function loadTradingData() {
         : [];
 
 
-    capitalData =
-      result?.summary ||
-      {};
-
+    /*
+     * SUMMARY
+     */
 
     summaryData =
       result?.summary ||
       {};
 
 
+    capitalData =
+      summaryData;
+
+
     /*
-     * Render UI.
+     * UPDATE UI
      */
 
     updateCapitalDisplay();
@@ -333,10 +455,6 @@ async function loadTradingData() {
     );
 
 
-    /*
-     * Jangan biarkan halaman kosong.
-     */
-
     transactions =
       Array.isArray(transactions)
         ? transactions
@@ -353,6 +471,7 @@ async function loadTradingData() {
   } finally {
 
     isLoadingTradingData = false;
+
 
     showGlobalLoading(
       false
@@ -415,10 +534,6 @@ async function handleTransactionSubmit(
 
   try {
 
-    /*
-     * Gunakan TradingAPI.
-     */
-
     if (
       !window.TradingAPI ||
       typeof window.TradingAPI.addTransaction !== "function"
@@ -445,10 +560,6 @@ async function handleTransactionSubmit(
 
     resetTransactionForm();
 
-
-    /*
-     * Reload semua data.
-     */
 
     await loadTradingData();
 
@@ -512,16 +623,6 @@ function collectTransactionData(
     getValue("lot");
 
 
-  /*
-   * HTML kemungkinan memakai:
-   *
-   * hasil
-   *
-   * sedangkan backend memakai:
-   *
-   * profitRugi
-   */
-
   const hasil =
     formData.get("hasil") ||
     formData.get("profitRugi") ||
@@ -546,12 +647,14 @@ function collectTransactionData(
         tanggal || ""
       ).trim(),
 
+
     saham:
       String(
         saham || ""
       )
       .trim()
       .toUpperCase(),
+
 
     aksi:
       String(
@@ -560,21 +663,22 @@ function collectTransactionData(
       .trim()
       .toUpperCase(),
 
+
     harga:
       parseNumber(harga),
+
 
     lot:
       parseNumber(lot),
 
-    /*
-     * Kirim dengan nama yang dipakai Apps Script.
-     */
 
     profitRugi:
       normalizeResult(hasil),
 
+
     nominal:
       parseNumber(nominal),
+
 
     catatan:
       String(
@@ -597,8 +701,12 @@ function validateTransaction(
   if (!transaction.tanggal) {
 
     return {
+
       valid: false,
-      message: "Tanggal wajib diisi."
+
+      message:
+        "Tanggal wajib diisi."
+
     };
 
   }
@@ -607,8 +715,12 @@ function validateTransaction(
   if (!transaction.saham) {
 
     return {
+
       valid: false,
-      message: "Kode saham wajib diisi."
+
+      message:
+        "Kode saham wajib diisi."
+
     };
 
   }
@@ -621,8 +733,12 @@ function validateTransaction(
   ) {
 
     return {
+
       valid: false,
-      message: "Aksi harus BUY atau SELL."
+
+      message:
+        "Aksi harus BUY atau SELL."
+
     };
 
   }
@@ -636,8 +752,12 @@ function validateTransaction(
   ) {
 
     return {
+
       valid: false,
-      message: "Harga harus lebih dari 0."
+
+      message:
+        "Harga harus lebih dari 0."
+
     };
 
   }
@@ -651,36 +771,38 @@ function validateTransaction(
   ) {
 
     return {
+
       valid: false,
-      message: "Lot harus lebih dari 0."
+
+      message:
+        "Lot harus lebih dari 0."
+
     };
 
   }
 
 
-  /*
-   * Profit/Rugi boleh kosong.
-   */
-
   if (
     transaction.profitRugi &&
-    !["PROFIT", "RUGI"].includes(
+    ![
+      "PROFIT",
+      "RUGI"
+    ].includes(
       transaction.profitRugi
     )
   ) {
 
     return {
+
       valid: false,
-      message: "Hasil harus PROFIT atau RUGI."
+
+      message:
+        "Hasil harus PROFIT atau RUGI."
+
     };
 
   }
 
-
-  /*
-   * Jika PROFIT/RUGI dipilih,
-   * nominal harus lebih dari 0.
-   */
 
   if (
     transaction.profitRugi &&
@@ -693,16 +815,21 @@ function validateTransaction(
   ) {
 
     return {
+
       valid: false,
+
       message:
         "Nominal profit/rugi wajib diisi."
+
     };
 
   }
 
 
   return {
+
     valid: true
+
   };
 
 }
@@ -742,6 +869,23 @@ function resetTransactionForm() {
       "BUY";
 
   }
+
+
+  const profitRugi =
+    document.getElementById(
+      "profitRugi"
+    );
+
+
+  if (profitRugi) {
+
+    profitRugi.value =
+      "";
+
+  }
+
+
+  setupProfitLossEvents();
 
 
   currentTransactionId =
@@ -813,7 +957,9 @@ function renderTransactions() {
     function (transaction) {
 
       const row =
-        document.createElement("tr");
+        document.createElement(
+          "tr"
+        );
 
 
       const tanggal =
@@ -854,14 +1000,6 @@ function renderTransactions() {
         );
 
 
-      /*
-       * Backend menggunakan:
-       *
-       * Profit/Rugi
-       *
-       * tetapi nama object memiliki karakter.
-       */
-
       const hasil =
         normalizeResult(
           transaction["Profit/Rugi"] ??
@@ -874,14 +1012,6 @@ function renderTransactions() {
         parseNumber(
           transaction.Nominal ??
           transaction.nominal
-        );
-
-
-      const catatan =
-        escapeHtml(
-          transaction.Catatan ??
-          transaction.catatan ??
-          "-"
         );
 
 
@@ -935,13 +1065,6 @@ function renderTransactions() {
           }
         </td>
 
-        <td
-          title="${catatan}"
-          class="text-muted"
-        >
-          ${catatan}
-        </td>
-
       `;
 
 
@@ -956,7 +1079,7 @@ function renderTransactions() {
 
 
 /* =========================================================
-   SORT
+   SORT TRANSACTIONS
 ========================================================= */
 
 function sortTransactions(
@@ -1014,22 +1137,6 @@ function updateTransactionCount() {
 
 function updateCapitalDisplay() {
 
-  /*
-   * Data berasal dari:
-   *
-   * summary:
-   *
-   * modalAwal
-   * totalTambah
-   * totalTarik
-   * modal
-   * totalProfit
-   * totalRugi
-   * netProfit
-   * total
-   */
-
-
   const modalAwal =
     getSummaryNumber(
       "modalAwal"
@@ -1055,7 +1162,7 @@ function updateCapitalDisplay() {
 
 
   /*
-   * Fallback hitung modal.
+   * Fallback perhitungan modal.
    */
 
   if (
@@ -1099,11 +1206,8 @@ function updateCapitalDisplay() {
     );
 
 
-  /*
-   * Simpan ke state.
-   */
-
   capitalData = {
+
     modalAwal:
       modalAwal,
 
@@ -1127,11 +1231,13 @@ function updateCapitalDisplay() {
 
     total:
       total
+
   };
 
 
   /*
-   * Update elemen halaman.
+   * ID untuk halaman laporan
+   * jika nanti digunakan.
    */
 
   setText(
@@ -1193,6 +1299,68 @@ function updateCapitalDisplay() {
     formatRupiah(total)
   );
 
+
+  /*
+   * ID SESUAI index.html
+   */
+
+  setText(
+    "modalValue",
+    formatRupiah(modal)
+  );
+
+
+  setText(
+    "profitLossValue",
+    formatSignedRupiah(netProfit)
+  );
+
+
+  setText(
+    "totalValue",
+    formatRupiah(
+      modal + netProfit
+    )
+  );
+
+
+  /*
+   * Warna profit / loss.
+   */
+
+  const profitElement =
+    document.getElementById(
+      "profitLossValue"
+    );
+
+
+  if (profitElement) {
+
+    profitElement.classList.remove(
+      "text-profit",
+      "text-loss"
+    );
+
+
+    if (netProfit > 0) {
+
+      profitElement.classList.add(
+        "text-profit"
+      );
+
+    }
+
+
+    if (netProfit < 0) {
+
+      profitElement.classList.add(
+        "text-loss"
+      );
+
+    }
+
+  }
+
 }
 
 
@@ -1225,12 +1393,15 @@ function getSummaryNumber(
 
 }
 
-
 /* =========================================================
    CAPITAL MODAL EVENTS
 ========================================================= */
 
 function setupModalEvents() {
+
+  /*
+   * Tombol tutup semua modal
+   */
 
   const closeButtons =
     document.querySelectorAll(
@@ -1250,20 +1421,24 @@ function setupModalEvents() {
   );
 
 
-  const overlay =
+  /*
+   * Overlay ADD MODAL
+   */
+
+  const addModal =
     document.getElementById(
-      "capitalModal"
+      "addModal"
     );
 
 
-  if (overlay) {
+  if (addModal) {
 
-    overlay.addEventListener(
+    addModal.addEventListener(
       "click",
       function (event) {
 
         if (
-          event.target === overlay
+          event.target === addModal
         ) {
 
           closeCapitalModal();
@@ -1276,21 +1451,79 @@ function setupModalEvents() {
   }
 
 
-  const form =
+  /*
+   * Overlay WITHDRAW MODAL
+   */
+
+  const withdrawModal =
     document.getElementById(
-      "capitalForm"
+      "withdrawModal"
     );
 
 
-  if (form) {
+  if (withdrawModal) {
 
-    form.addEventListener(
-      "submit",
-      handleCapitalSubmit
+    withdrawModal.addEventListener(
+      "click",
+      function (event) {
+
+        if (
+          event.target === withdrawModal
+        ) {
+
+          closeCapitalModal();
+
+        }
+
+      }
     );
 
   }
 
+
+  /*
+   * FORM TAMBAH MODAL
+   */
+
+  const addForm =
+    document.getElementById(
+      "addModalForm"
+    );
+
+
+  if (addForm) {
+
+    addForm.addEventListener(
+      "submit",
+      handleAddModalSubmit
+    );
+
+  }
+
+
+  /*
+   * FORM TARIK MODAL
+   */
+
+  const withdrawForm =
+    document.getElementById(
+      "withdrawModalForm"
+    );
+
+
+  if (withdrawForm) {
+
+    withdrawForm.addEventListener(
+      "submit",
+      handleWithdrawModalSubmit
+    );
+
+  }
+
+
+  /*
+   * ESCAPE
+   */
 
   document.addEventListener(
     "keydown",
@@ -1318,16 +1551,30 @@ function openCapitalModal(
   type
 ) {
 
+  /*
+   * Tutup modal terlebih dahulu.
+   */
+
+  closeCapitalModal();
+
+
+  const modalId =
+    type === "add"
+      ? "addModal"
+      : "withdrawModal";
+
+
   const modal =
     document.getElementById(
-      "capitalModal"
+      modalId
     );
 
 
   if (!modal) {
 
     console.warn(
-      "#capitalModal tidak ditemukan."
+      "Modal tidak ditemukan:",
+      modalId
     );
 
     return;
@@ -1335,54 +1582,54 @@ function openCapitalModal(
   }
 
 
-  const title =
-    document.getElementById(
-      "capitalModalTitle"
-    );
+  /*
+   * Tentukan ID input.
+   */
+
+  const dateId =
+    type === "add"
+      ? "addModalTanggal"
+      : "withdrawModalTanggal";
 
 
-  const description =
+  const amountId =
+    type === "add"
+      ? "addModalNominal"
+      : "withdrawModalNominal";
+
+
+  const noteId =
+    type === "add"
+      ? "addModalCatatan"
+      : "withdrawModalCatatan";
+
+
+  const dateInput =
     document.getElementById(
-      "capitalModalDescription"
+      dateId
     );
 
 
   const amountInput =
     document.getElementById(
-      "capitalAmount"
+      amountId
     );
 
 
-  const typeInput =
+  const noteInput =
     document.getElementById(
-      "capitalType"
+      noteId
     );
 
 
-  if (typeInput) {
+  /*
+   * Reset input.
+   */
 
-    typeInput.value =
-      type;
+  if (dateInput) {
 
-  }
-
-
-  if (title) {
-
-    title.textContent =
-      type === "add"
-        ? "Tambah Modal"
-        : "Tarik Modal";
-
-  }
-
-
-  if (description) {
-
-    description.textContent =
-      type === "add"
-        ? "Masukkan nominal modal yang ingin ditambahkan."
-        : "Masukkan nominal modal yang ingin ditarik.";
+    dateInput.value =
+      getTodayDate();
 
   }
 
@@ -1391,23 +1638,7 @@ function openCapitalModal(
 
     amountInput.value = "";
 
-
-    setTimeout(
-      function () {
-
-        amountInput.focus();
-
-      },
-      100
-    );
-
   }
-
-
-  const noteInput =
-    document.getElementById(
-      "capitalNote"
-    );
 
 
   if (noteInput) {
@@ -1416,6 +1647,10 @@ function openCapitalModal(
 
   }
 
+
+  /*
+   * Tampilkan modal.
+   */
 
   modal.classList.remove(
     "hidden"
@@ -1431,6 +1666,24 @@ function openCapitalModal(
   document.body.style.overflow =
     "hidden";
 
+
+  /*
+   * Fokus nominal.
+   */
+
+  setTimeout(
+    function () {
+
+      if (amountInput) {
+
+        amountInput.focus();
+
+      }
+
+    },
+    100
+  );
+
 }
 
 
@@ -1440,25 +1693,40 @@ function openCapitalModal(
 
 function closeCapitalModal() {
 
-  const modal =
-    document.getElementById(
-      "capitalModal"
-    );
+  const modalIds = [
+
+    "addModal",
+
+    "withdrawModal"
+
+  ];
 
 
-  if (!modal) {
-    return;
-  }
+  modalIds.forEach(
+    function (id) {
+
+      const modal =
+        document.getElementById(
+          id
+        );
 
 
-  modal.classList.add(
-    "hidden"
-  );
+      if (!modal) {
+        return;
+      }
 
 
-  modal.setAttribute(
-    "aria-hidden",
-    "true"
+      modal.classList.add(
+        "hidden"
+      );
+
+
+      modal.setAttribute(
+        "aria-hidden",
+        "true"
+      );
+
+    }
   );
 
 
@@ -1469,41 +1737,62 @@ function closeCapitalModal() {
 
 
 /* =========================================================
-   CAPITAL SUBMIT
+   ADD CAPITAL
 ========================================================= */
 
-async function handleCapitalSubmit(
+async function handleAddModalSubmit(
   event
 ) {
 
   event.preventDefault();
 
 
-  const type =
+  const tanggal =
     document.getElementById(
-      "capitalType"
+      "addModalTanggal"
     )?.value ||
-    "add";
+    "";
 
 
-  const amount =
+  const nominal =
     parseNumber(
       document.getElementById(
-        "capitalAmount"
+        "addModalNominal"
       )?.value
     );
 
 
-  const note =
+  const catatan =
     document.getElementById(
-      "capitalNote"
+      "addModalCatatan"
     )?.value?.trim() ||
     "";
 
 
+  /*
+   * VALIDASI TANGGAL
+   */
+
+  if (!tanggal) {
+
+    showToast(
+      "Data belum lengkap",
+      "Tanggal wajib diisi.",
+      "error"
+    );
+
+    return;
+
+  }
+
+
+  /*
+   * VALIDASI NOMINAL
+   */
+
   if (
-    !Number.isFinite(amount) ||
-    amount <= 0
+    !Number.isFinite(nominal) ||
+    nominal <= 0
   ) {
 
     showToast(
@@ -1518,97 +1807,226 @@ async function handleCapitalSubmit(
 
 
   /*
-   * Cek modal ketika melakukan penarikan.
+   * CEK API
    */
 
   if (
-    type === "withdraw"
+    !window.TradingAPI ||
+    typeof window.TradingAPI.addCapital !== "function"
   ) {
 
-    const currentCapital =
-      getSummaryNumber(
-        "modal"
-      );
+    showToast(
+      "API tidak tersedia",
+      "Fungsi addCapital belum tersedia di api.js.",
+      "error"
+    );
 
-
-    if (
-      amount > currentCapital
-    ) {
-
-      showToast(
-        "Tidak bisa menarik",
-        "Nominal penarikan melebihi modal saat ini.",
-        "error"
-      );
-
-      return;
-
-    }
+    return;
 
   }
 
 
   showGlobalLoading(
     true,
-    type === "add"
-      ? "Menambahkan modal..."
-      : "Memproses penarikan..."
+    "Menambahkan modal..."
   );
 
 
   try {
 
-    if (
-      !window.TradingAPI
-    ) {
+    /*
+     * Kirim data.
+     *
+     * Parameter dibuat kompatibel
+     * dengan API lama.
+     */
 
-      throw new Error(
-        "TradingAPI tidak tersedia."
-      );
-
-    }
-
-
-    if (
-      type === "add"
-    ) {
-
-      if (
-        typeof window.TradingAPI.addCapital !== "function"
-      ) {
-
-        throw new Error(
-          "Fungsi addCapital tidak tersedia di api.js."
-        );
-
-      }
+    await window.TradingAPI.addCapital(
+      nominal,
+      catatan,
+      tanggal
+    );
 
 
-      await window.TradingAPI.addCapital(
-        amount,
-        note
-      );
+    /*
+     * Tutup modal.
+     */
+
+    closeCapitalModal();
 
 
-    } else {
+    /*
+     * Notifikasi.
+     */
 
-      if (
-        typeof window.TradingAPI.withdrawCapital !== "function"
-      ) {
-
-        throw new Error(
-          "Fungsi withdrawCapital tidak tersedia di api.js."
-        );
-
-      }
+    showToast(
+      "Berhasil",
+      "Modal berhasil ditambahkan.",
+      "success"
+    );
 
 
-      await window.TradingAPI.withdrawCapital(
-        amount,
-        note
-      );
+    /*
+     * Refresh semua data.
+     */
 
-    }
+    await loadTradingData();
+
+
+  } catch (error) {
+
+    console.error(
+      "Add capital error:",
+      error
+    );
+
+
+    showToast(
+      "Gagal menambah modal",
+      getApiErrorMessage(error),
+      "error"
+    );
+
+
+  } finally {
+
+    showGlobalLoading(
+      false
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   WITHDRAW CAPITAL
+========================================================= */
+
+async function handleWithdrawModalSubmit(
+  event
+) {
+
+  event.preventDefault();
+
+
+  const tanggal =
+    document.getElementById(
+      "withdrawModalTanggal"
+    )?.value ||
+    "";
+
+
+  const nominal =
+    parseNumber(
+      document.getElementById(
+        "withdrawModalNominal"
+      )?.value
+    );
+
+
+  const catatan =
+    document.getElementById(
+      "withdrawModalCatatan"
+    )?.value?.trim() ||
+    "";
+
+
+  /*
+   * VALIDASI TANGGAL
+   */
+
+  if (!tanggal) {
+
+    showToast(
+      "Data belum lengkap",
+      "Tanggal wajib diisi.",
+      "error"
+    );
+
+    return;
+
+  }
+
+
+  /*
+   * VALIDASI NOMINAL
+   */
+
+  if (
+    !Number.isFinite(nominal) ||
+    nominal <= 0
+  ) {
+
+    showToast(
+      "Nominal tidak valid",
+      "Masukkan nominal lebih dari 0.",
+      "error"
+    );
+
+    return;
+
+  }
+
+
+  /*
+   * MODAL TERSEDIA
+   */
+
+  const currentCapital =
+    getSummaryNumber(
+      "modal"
+    );
+
+
+  if (
+    nominal > currentCapital
+  ) {
+
+    showToast(
+      "Penarikan ditolak",
+      "Nominal penarikan melebihi modal yang tersedia.",
+      "error"
+    );
+
+    return;
+
+  }
+
+
+  /*
+   * CEK API
+   */
+
+  if (
+    !window.TradingAPI ||
+    typeof window.TradingAPI.withdrawCapital !== "function"
+  ) {
+
+    showToast(
+      "API tidak tersedia",
+      "Fungsi withdrawCapital belum tersedia di api.js.",
+      "error"
+    );
+
+    return;
+
+  }
+
+
+  showGlobalLoading(
+    true,
+    "Memproses penarikan..."
+  );
+
+
+  try {
+
+    await window.TradingAPI.withdrawCapital(
+      nominal,
+      catatan,
+      tanggal
+    );
 
 
     closeCapitalModal();
@@ -1616,9 +2034,7 @@ async function handleCapitalSubmit(
 
     showToast(
       "Berhasil",
-      type === "add"
-        ? "Modal berhasil ditambahkan."
-        : "Modal berhasil ditarik.",
+      "Modal berhasil ditarik.",
       "success"
     );
 
@@ -1629,13 +2045,13 @@ async function handleCapitalSubmit(
   } catch (error) {
 
     console.error(
-      "Capital error:",
+      "Withdraw capital error:",
       error
     );
 
 
     showToast(
-      "Gagal",
+      "Gagal menarik modal",
       getApiErrorMessage(error),
       "error"
     );
@@ -1712,8 +2128,9 @@ function getActionClass(
 ) {
 
   const value =
-    String(action || "")
-      .toUpperCase();
+    String(
+      action || ""
+    ).toUpperCase();
 
 
   if (
@@ -1771,7 +2188,7 @@ function getResultClass(
 
 
 /* =========================================================
-   AMOUNT CLASS BY RESULT
+   AMOUNT CLASS
 ========================================================= */
 
 function getAmountClassByResult(
@@ -1894,13 +2311,13 @@ function formatDate(
   }
 
 
-  /*
-   * YYYY-MM-DD
-   */
-
   const stringValue =
     String(value);
 
+
+  /*
+   * YYYY-MM-DD
+   */
 
   if (
     /^\d{4}-\d{2}-\d{2}$/.test(
@@ -1966,7 +2383,7 @@ function formatDate(
 
 
 /* =========================================================
-   PARSE DATE VALUE
+   PARSE DATE
 ========================================================= */
 
 function parseDateValue(
@@ -1993,7 +2410,8 @@ function parseDateValue(
   ) {
 
     return new Date(
-      stringValue + "T00:00:00"
+      stringValue +
+      "T00:00:00"
     ).getTime();
 
   }
@@ -2084,7 +2502,7 @@ function parseNumber(
 
 
   /*
-   * Indonesia:
+   * Format Indonesia:
    *
    * 8.200
    * 10.000.000
@@ -2105,6 +2523,8 @@ function parseNumber(
 
 
   /*
+   * Format desimal:
+   *
    * 8200,5
    */
 
@@ -2135,7 +2555,9 @@ function getValue(
 ) {
 
   const element =
-    document.getElementById(id);
+    document.getElementById(
+      id
+    );
 
 
   return element
@@ -2155,7 +2577,9 @@ function setText(
 ) {
 
   const element =
-    document.getElementById(id);
+    document.getElementById(
+      id
+    );
 
 
   if (element) {
@@ -2169,7 +2593,7 @@ function setText(
 
 
 /* =========================================================
-   SHOW / HIDE
+   SHOW / HIDE ELEMENT
 ========================================================= */
 
 function showElement(
@@ -2178,7 +2602,9 @@ function showElement(
 ) {
 
   const element =
-    document.getElementById(id);
+    document.getElementById(
+      id
+    );
 
 
   if (!element) {
@@ -2273,12 +2699,30 @@ function showToast(
     );
 
 
+  /*
+   * Jika toast tidak ada,
+   * tetap tampilkan di console.
+   */
+
   if (!toast) {
 
-    console[type === "error" ? "error" : "log"](
-      title + ":",
-      message
-    );
+    if (
+      type === "error"
+    ) {
+
+      console.error(
+        title + ":",
+        message
+      );
+
+    } else {
+
+      console.log(
+        title + ":",
+        message
+      );
+
+    }
 
     return;
 
@@ -2367,7 +2811,7 @@ function showToast(
 
 
 /* =========================================================
-   API ERROR
+   API ERROR MESSAGE
 ========================================================= */
 
 function getApiErrorMessage(
@@ -2395,6 +2839,17 @@ function getApiErrorMessage(
   ) {
 
     return error.message;
+
+  }
+
+
+  if (
+    error.error
+  ) {
+
+    return String(
+      error.error
+    );
 
   }
 
@@ -2438,7 +2893,7 @@ function escapeHtml(
 
 
 /* =========================================================
-   EXPOSE PAGE
+   EXPOSE TRADING PAGE
 ========================================================= */
 
 window.TradingPage = {
