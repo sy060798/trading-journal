@@ -3,12 +3,22 @@
    API CONNECTION
    Google Apps Script + Google Sheets
 
-   COMPATIBLE DENGAN Code.gs:
-   - GET  -> mengambil semua data
-   - POST transaction
-   - POST add_modal
-   - POST withdraw_modal
+   VERSION:
+   FIX JSON REQUEST
+
+   Backend Code.gs menggunakan:
+
+   doGet()
+   doPost()
+
+   doPost membaca:
+
+   JSON.parse(e.postData.contents)
+
+   Maka frontend WAJIB mengirim JSON.
 ========================================================= */
+
+"use strict";
 
 
 /* =========================================================
@@ -20,31 +30,92 @@ const API_URL =
 
 
 /* =========================================================
-   CONFIG
+   BASIC CONFIG
 ========================================================= */
 
 const API_CONFIG = {
-  timeout: 30000
+
+  timeout: 30000,
+
+  /*
+   * text/plain digunakan supaya request
+   * tidak memicu preflight CORS seperti
+   * application/json pada beberapa kondisi
+   * Google Apps Script.
+   *
+   * Isi body tetap JSON.
+   */
+
+  contentType:
+    "text/plain;charset=UTF-8"
+
 };
 
 
 /* =========================================================
-   REQUEST JSON
+   CHECK API URL
 ========================================================= */
 
-async function apiPost(action, data = {}) {
+function validateApiUrl() {
 
-  if (!API_URL) {
+  if (
+    !API_URL ||
+    typeof API_URL !== "string"
+  ) {
+
     throw new Error(
       "API_URL belum diisi."
     );
+
   }
 
 
+  if (
+    API_URL.includes("GANTI_DENGAN")
+  ) {
+
+    throw new Error(
+      "API_URL masih menggunakan URL placeholder."
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   REQUEST HELPER
+========================================================= */
+
+/**
+ * Mengirim POST JSON ke Google Apps Script.
+ *
+ * Backend:
+ *
+ * function doPost(e) {
+ *
+ *   const body =
+ *     JSON.parse(
+ *       e.postData.contents
+ *     );
+ *
+ * }
+ */
+
+async function apiRequest(
+  action,
+  data = {}
+) {
+
+  validateApiUrl();
+
+
   if (!action) {
+
     throw new Error(
       "Action API tidak boleh kosong."
     );
+
   }
 
 
@@ -54,74 +125,125 @@ async function apiPost(action, data = {}) {
 
   const timeout =
     setTimeout(
-      () => controller.abort(),
+      function () {
+
+        controller.abort();
+
+      },
       API_CONFIG.timeout
     );
 
 
   try {
 
+    /*
+     * ==========================================
+     * BODY JSON
+     * ==========================================
+     */
+
     const payload = {
-      action: action,
+
+      action:
+        action,
+
       ...data
+
     };
 
 
+    const body =
+      JSON.stringify(payload);
+
+
     console.log(
-      "[API POST]",
+      "[TradingAPI] POST:",
+      action,
       payload
     );
 
+
+    /*
+     * ==========================================
+     * FETCH
+     * ==========================================
+     */
 
     const response =
       await fetch(
         API_URL,
         {
-          method: "POST",
 
-          /*
-           * text/plain sengaja digunakan
-           * supaya browser tidak melakukan
-           * preflight OPTIONS.
-           */
+          method:
+            "POST",
 
           headers: {
+
+            /*
+             * text/plain sengaja digunakan.
+             *
+             * Body tetap JSON.
+             *
+             * Apps Script tetap bisa membaca:
+             *
+             * JSON.parse(
+             *   e.postData.contents
+             * )
+             */
+
             "Content-Type":
-              "text/plain;charset=utf-8"
+              API_CONFIG.contentType
+
           },
 
           body:
-            JSON.stringify(payload),
-
-          redirect:
-            "follow",
+            body,
 
           signal:
             controller.signal
+
         }
       );
 
 
+    /*
+     * ==========================================
+     * HTTP STATUS
+     * ==========================================
+     */
+
     if (!response.ok) {
 
       throw new Error(
-        `HTTP Error ${response.status}`
+        "HTTP Error " +
+        response.status +
+        " " +
+        response.statusText
       );
 
     }
 
+
+    /*
+     * ==========================================
+     * RESPONSE TEXT
+     * ==========================================
+     */
 
     const text =
       await response.text();
 
 
     console.log(
-      "[API RESPONSE]",
+      "[TradingAPI] RESPONSE:",
       text
     );
 
 
-    if (!text) {
+    if (
+      !text ||
+      !text.trim()
+    ) {
 
       throw new Error(
         "Google Apps Script mengembalikan response kosong."
@@ -130,18 +252,30 @@ async function apiPost(action, data = {}) {
     }
 
 
+    /*
+     * ==========================================
+     * PARSE JSON
+     * ==========================================
+     */
+
     let result;
 
 
     try {
 
       result =
-        JSON.parse(text);
+        JSON.parse(
+          text
+        );
 
-    } catch (error) {
+    } catch (parseError) {
 
       console.error(
-        "Response bukan JSON:",
+        "[TradingAPI] JSON PARSE ERROR"
+      );
+
+      console.error(
+        "Response:",
         text
       );
 
@@ -152,6 +286,12 @@ async function apiPost(action, data = {}) {
 
     }
 
+
+    /*
+     * ==========================================
+     * BACKEND ERROR
+     * ==========================================
+     */
 
     if (
       result &&
@@ -166,10 +306,22 @@ async function apiPost(action, data = {}) {
     }
 
 
+    /*
+     * ==========================================
+     * SUCCESS
+     * ==========================================
+     */
+
     return result;
 
 
   } catch (error) {
+
+    /*
+     * ==========================================
+     * TIMEOUT
+     * ==========================================
+     */
 
     if (
       error &&
@@ -177,11 +329,44 @@ async function apiPost(action, data = {}) {
     ) {
 
       throw new Error(
-        "Request timeout. Periksa koneksi Google Apps Script."
+        "Request timeout setelah " +
+        API_CONFIG.timeout +
+        " ms. Periksa koneksi dan deployment Apps Script."
       );
 
     }
 
+
+    /*
+     * ==========================================
+     * NETWORK ERROR
+     * ==========================================
+     */
+
+    if (
+      error &&
+      error instanceof TypeError
+    ) {
+
+      console.error(
+        "[TradingAPI] NETWORK ERROR:",
+        error
+      );
+
+
+      throw new Error(
+        "Tidak dapat terhubung ke Google Apps Script. " +
+        "Periksa URL Web App, deployment, akses Web App, dan koneksi internet."
+      );
+
+    }
+
+
+    /*
+     * ==========================================
+     * PASS ERROR
+     * ==========================================
+     */
 
     throw error;
 
@@ -201,15 +386,25 @@ async function apiPost(action, data = {}) {
    GET ALL DATA
 ========================================================= */
 
+/**
+ * Code.gs doGet() mengembalikan:
+ *
+ * {
+ *   success: true,
+ *   data: {
+ *     transaksi: [],
+ *     modal: [],
+ *     summary: {}
+ *   }
+ * }
+ *
+ * Karena doGet tidak membutuhkan action,
+ * kita gunakan fetch GET langsung.
+ */
+
 async function getAllData() {
 
-  if (!API_URL) {
-
-    throw new Error(
-      "API_URL belum diisi."
-    );
-
-  }
+  validateApiUrl();
 
 
   const controller =
@@ -218,7 +413,11 @@ async function getAllData() {
 
   const timeout =
     setTimeout(
-      () => controller.abort(),
+      function () {
+
+        controller.abort();
+
+      },
       API_CONFIG.timeout
     );
 
@@ -226,8 +425,7 @@ async function getAllData() {
   try {
 
     console.log(
-      "[API GET]",
-      API_URL
+      "[TradingAPI] GET ALL DATA"
     );
 
 
@@ -235,13 +433,13 @@ async function getAllData() {
       await fetch(
         API_URL,
         {
-          method: "GET",
 
-          redirect:
-            "follow",
+          method:
+            "GET",
 
           signal:
             controller.signal
+
         }
       );
 
@@ -249,7 +447,10 @@ async function getAllData() {
     if (!response.ok) {
 
       throw new Error(
-        `HTTP Error ${response.status}`
+        "HTTP Error " +
+        response.status +
+        " " +
+        response.statusText
       );
 
     }
@@ -260,12 +461,15 @@ async function getAllData() {
 
 
     console.log(
-      "[API GET RESPONSE]",
+      "[TradingAPI] GET RESPONSE:",
       text
     );
 
 
-    if (!text) {
+    if (
+      !text ||
+      !text.trim()
+    ) {
 
       throw new Error(
         "Google Apps Script mengembalikan response kosong."
@@ -280,7 +484,9 @@ async function getAllData() {
     try {
 
       result =
-        JSON.parse(text);
+        JSON.parse(
+          text
+        );
 
     } catch (error) {
 
@@ -291,7 +497,7 @@ async function getAllData() {
 
 
       throw new Error(
-        "Response GET Google Apps Script bukan JSON yang valid."
+        "Response Google Apps Script bukan JSON yang valid."
       );
 
     }
@@ -304,7 +510,7 @@ async function getAllData() {
 
       throw new Error(
         result.message ||
-        "Google Apps Script mengembalikan error."
+        "Gagal mengambil data dari Google Sheets."
       );
 
     }
@@ -321,7 +527,19 @@ async function getAllData() {
     ) {
 
       throw new Error(
-        "Request timeout. Periksa koneksi Google Apps Script."
+        "Request timeout saat mengambil data trading."
+      );
+
+    }
+
+
+    if (
+      error &&
+      error instanceof TypeError
+    ) {
+
+      throw new Error(
+        "Tidak dapat terhubung ke Google Apps Script."
       );
 
     }
@@ -352,22 +570,44 @@ async function getTransactions() {
 
 
   const data =
-    result?.data || {};
+    result?.data;
 
 
-  return (
+  if (
+    data &&
     Array.isArray(
       data.transaksi
     )
-      ? data.transaksi
-      : []
-  );
+  ) {
+
+    return data.transaksi;
+
+  }
+
+
+  /*
+   * Fallback jika backend suatu saat
+   * mengembalikan transactions.
+   */
+
+  if (
+    Array.isArray(
+      result?.transactions
+    )
+  ) {
+
+    return result.transactions;
+
+  }
+
+
+  return [];
 
 }
 
 
 /* =========================================================
-   GET CAPITAL / SUMMARY
+   GET CAPITAL
 ========================================================= */
 
 async function getCapital() {
@@ -376,10 +616,49 @@ async function getCapital() {
     await getAllData();
 
 
-  return (
-    result?.data?.summary ||
-    {}
-  );
+  const data =
+    result?.data;
+
+
+  /*
+   * Backend sekarang:
+   *
+   * data.summary
+   */
+
+  if (
+    data &&
+    data.summary
+  ) {
+
+    return data.summary;
+
+  }
+
+
+  /*
+   * Fallback
+   */
+
+  if (
+    result?.capital
+  ) {
+
+    return result.capital;
+
+  }
+
+
+  if (
+    result?.data?.capital
+  ) {
+
+    return result.data.capital;
+
+  }
+
+
+  return {};
 
 }
 
@@ -394,10 +673,30 @@ async function getReport() {
     await getAllData();
 
 
-  return (
-    result?.data ||
-    {}
-  );
+  const data =
+    result?.data;
+
+
+  if (
+    data &&
+    data.summary
+  ) {
+
+    return data.summary;
+
+  }
+
+
+  if (
+    result?.report
+  ) {
+
+    return result.report;
+
+  }
+
+
+  return {};
 
 }
 
@@ -405,6 +704,28 @@ async function getReport() {
 /* =========================================================
    ADD TRANSACTION
 ========================================================= */
+
+/**
+ * Backend Code.gs:
+ *
+ * case 'transaction':
+ *   result = addTransaction(body);
+ *
+ *
+ * Jadi frontend HARUS mengirim:
+ *
+ * {
+ *   action: "transaction",
+ *   tanggal: "...",
+ *   saham: "...",
+ *   aksi: "...",
+ *   harga: ...,
+ *   lot: ...,
+ *   profitRugi: "...",
+ *   nominal: ...,
+ *   catatan: "..."
+ * }
+ */
 
 async function addTransaction(
   transaction
@@ -423,81 +744,215 @@ async function addTransaction(
 
 
   /*
-   * Sesuai dengan Code.gs:
-   *
-   * case 'transaction':
-   *     result = addTransaction(body);
-   *
-   * Jadi data transaksi dikirim langsung
-   * ke body JSON.
+   * ==========================================
+   * NORMALISASI
+   * ==========================================
    */
 
-  const payload = {
+  const tanggal =
+    transaction.tanggal ||
+    "";
 
-    tanggal:
-      transaction.tanggal ||
-      "",
-
-    saham:
+  const saham =
+    String(
       transaction.saham ||
-      "",
-
-    aksi:
-      transaction.aksi ||
-      "",
-
-    harga:
-      transaction.harga ||
-      0,
-
-    lot:
-      transaction.lot ||
-      0,
-
-    profitRugi:
-      transaction.profitRugi ||
-      transaction.hasil ||
-      "",
-
-    nominal:
-      transaction.nominal ||
-      0,
-
-    catatan:
-      transaction.catatan ||
       ""
-
-  };
-
-
-  return await apiPost(
-    "transaction",
-    payload
-  );
-
-}
+    )
+    .trim()
+    .toUpperCase();
 
 
-/* =========================================================
-   DELETE TRANSACTION
-========================================================= */
+  const aksi =
+    String(
+      transaction.aksi ||
+      ""
+    )
+    .trim()
+    .toUpperCase();
 
-async function deleteTransaction(
-  id
-) {
+
+  const harga =
+    Number(
+      transaction.harga
+    ) || 0;
+
+
+  const lot =
+    Number(
+      transaction.lot
+    ) || 0;
+
 
   /*
-   * Code.gs saat ini BELUM mempunyai
-   * action deleteTransaction.
-   *
-   * Jadi jangan panggil endpoint ini
-   * sebelum fitur delete ditambahkan
-   * ke Code.gs.
+   * trading.js menggunakan "hasil"
+   * sedangkan Code.gs menggunakan
+   * "profitRugi".
    */
 
-  throw new Error(
-    "Fitur hapus transaksi belum diaktifkan di Google Apps Script."
-  );
+  let profitRugi =
+    transaction.profitRugi;
+
+
+  if (
+    profitRugi === undefined ||
+    profitRugi === null ||
+    profitRugi === ""
+  ) {
+
+    profitRugi =
+      transaction.hasil ||
+      "";
+
+  }
+
+
+  profitRugi =
+    String(
+      profitRugi
+    )
+    .trim()
+    .toUpperCase();
+
+
+  const nominal =
+    Number(
+      transaction.nominal
+    ) || 0;
+
+
+  const catatan =
+    String(
+      transaction.catatan ||
+      ""
+    )
+    .trim();
+
+
+  /*
+   * ==========================================
+   * VALIDASI FRONTEND
+   * ==========================================
+   */
+
+  if (!tanggal) {
+
+    throw new Error(
+      "Tanggal transaksi wajib diisi."
+    );
+
+  }
+
+
+  if (!saham) {
+
+    throw new Error(
+      "Kode saham wajib diisi."
+    );
+
+  }
+
+
+  if (
+    aksi !== "BUY" &&
+    aksi !== "SELL"
+  ) {
+
+    throw new Error(
+      "Aksi transaksi harus BUY atau SELL."
+    );
+
+  }
+
+
+  if (
+    !Number.isFinite(harga) ||
+    harga <= 0
+  ) {
+
+    throw new Error(
+      "Harga harus lebih besar dari 0."
+    );
+
+  }
+
+
+  if (
+    !Number.isFinite(lot) ||
+    lot <= 0
+  ) {
+
+    throw new Error(
+      "Lot harus lebih besar dari 0."
+    );
+
+  }
+
+
+  if (
+    profitRugi !== "" &&
+    profitRugi !== "PROFIT" &&
+    profitRugi !== "RUGI"
+  ) {
+
+    throw new Error(
+      "Hasil harus PROFIT atau RUGI."
+    );
+
+  }
+
+
+  if (
+    profitRugi !== "" &&
+    nominal <= 0
+  ) {
+
+    throw new Error(
+      "Nominal wajib lebih besar dari 0 jika PROFIT/RUGI dipilih."
+    );
+
+  }
+
+
+  /*
+   * ==========================================
+   * KIRIM KE APPS SCRIPT
+   * ==========================================
+   */
+
+  const result =
+    await apiRequest(
+      "transaction",
+      {
+
+        tanggal:
+          tanggal,
+
+        saham:
+          saham,
+
+        aksi:
+          aksi,
+
+        harga:
+          harga,
+
+        lot:
+          lot,
+
+        profitRugi:
+          profitRugi,
+
+        nominal:
+          nominal,
+
+        catatan:
+          catatan
+
+      }
+    );
+
+
+  return result;
 
 }
 
@@ -506,13 +961,22 @@ async function deleteTransaction(
    ADD CAPITAL
 ========================================================= */
 
+/**
+ * Backend:
+ *
+ * case 'add_modal':
+ *   result = addModal(body);
+ */
+
 async function addCapital(
   amount,
   note = ""
 ) {
 
   amount =
-    Number(amount);
+    Number(
+      amount
+    );
 
 
   if (
@@ -528,25 +992,34 @@ async function addCapital(
 
 
   /*
-   * Code.gs:
-   *
-   * case 'add_modal':
-   *     result = addModal(body);
+   * Gunakan tanggal hari ini.
    */
 
-  return await apiPost(
-    "add_modal",
-    {
-      tanggal:
-        getTodayDate(),
+  const tanggal =
+    getTodayString();
 
-      nominal:
-        amount,
 
-      catatan:
-        note || ""
-    }
-  );
+  const result =
+    await apiRequest(
+      "add_modal",
+      {
+
+        tanggal:
+          tanggal,
+
+        nominal:
+          amount,
+
+        catatan:
+          String(
+            note || ""
+          ).trim()
+
+      }
+    );
+
+
+  return result;
 
 }
 
@@ -555,13 +1028,22 @@ async function addCapital(
    WITHDRAW CAPITAL
 ========================================================= */
 
+/**
+ * Backend:
+ *
+ * case 'withdraw_modal':
+ *   result = withdrawModal(body);
+ */
+
 async function withdrawCapital(
   amount,
   note = ""
 ) {
 
   amount =
-    Number(amount);
+    Number(
+      amount
+    );
 
 
   if (
@@ -577,34 +1059,130 @@ async function withdrawCapital(
 
 
   /*
-   * Code.gs:
-   *
-   * case 'withdraw_modal':
-   *     result = withdrawModal(body);
+   * Gunakan tanggal hari ini.
    */
 
-  return await apiPost(
-    "withdraw_modal",
-    {
-      tanggal:
-        getTodayDate(),
+  const tanggal =
+    getTodayString();
 
-      nominal:
-        amount,
 
-      catatan:
-        note || ""
-    }
+  const result =
+    await apiRequest(
+      "withdraw_modal",
+      {
+
+        tanggal:
+          tanggal,
+
+        nominal:
+          amount,
+
+        catatan:
+          String(
+            note || ""
+          ).trim()
+
+      }
+    );
+
+
+  return result;
+
+}
+
+
+/* =========================================================
+   DELETE TRANSACTION
+========================================================= */
+
+/**
+ * Code.gs yang kamu kirim BELUM memiliki
+ * action deleteTransaction.
+ *
+ * Jadi jangan mengirim request palsu.
+ */
+
+async function deleteTransaction(
+  id
+) {
+
+  if (
+    id === undefined ||
+    id === null ||
+    id === ""
+  ) {
+
+    throw new Error(
+      "ID transaksi tidak ditemukan."
+    );
+
+  }
+
+
+  throw new Error(
+    "Fitur hapus transaksi belum tersedia di Apps Script."
   );
 
 }
 
 
 /* =========================================================
-   TODAY
+   GENERIC POST
 ========================================================= */
 
-function getTodayDate() {
+async function apiPost(
+  action,
+  data = {}
+) {
+
+  return await apiRequest(
+    action,
+    data
+  );
+
+}
+
+
+/* =========================================================
+   GENERIC GET
+========================================================= */
+
+/**
+ * Karena doGet() backend mengembalikan
+ * seluruh data sekaligus, generic GET
+ * mengambil seluruh data.
+ */
+
+async function apiGet(
+  action = "",
+  data = {}
+) {
+
+  /*
+   * action/data disimpan sebagai parameter
+   * API helper agar kompatibel dengan kode
+   * frontend lama.
+   *
+   * Namun Code.gs doGet tidak membutuhkan
+   * parameter tersebut.
+   */
+
+  return await getAllData();
+
+}
+
+
+/* =========================================================
+   TODAY STRING
+========================================================= */
+
+/**
+ * Hasil:
+ *
+ * 2026-08-15
+ */
+
+function getTodayString() {
 
   const now =
     new Date();
@@ -617,7 +1195,8 @@ function getTodayDate() {
   const month =
     String(
       now.getMonth() + 1
-    ).padStart(
+    )
+    .padStart(
       2,
       "0"
     );
@@ -626,113 +1205,89 @@ function getTodayDate() {
   const day =
     String(
       now.getDate()
-    ).padStart(
+    )
+    .padStart(
       2,
       "0"
     );
 
 
   return (
-    `${year}-${month}-${day}`
+    year +
+    "-" +
+    month +
+    "-" +
+    day
   );
 
 }
 
 
 /* =========================================================
-   GENERIC REQUEST
-========================================================= */
-
-async function apiRequest(
-  action,
-  data = {}
-) {
-
-  /*
-   * Untuk action GET data,
-   * gunakan getAllData().
-   */
-
-  if (
-    action === "getTransactions" ||
-    action === "getCapital" ||
-    action === "getReport"
-  ) {
-
-    return await getAllData();
-
-  }
-
-
-  /*
-   * Untuk POST.
-   */
-
-  return await apiPost(
-    action,
-    data
-  );
-
-}
-
-
-/* =========================================================
-   TEST CONNECTION
+   CONNECTION TEST
 ========================================================= */
 
 async function testApiConnection() {
 
   try {
 
+    console.log(
+      "========================================"
+    );
+
+    console.log(
+      "TRADING JOURNAL API TEST"
+    );
+
+    console.log(
+      "URL:",
+      API_URL
+    );
+
+
     const result =
       await getAllData();
 
 
     console.log(
-      "================================="
+      "Connection: OK"
     );
 
-    console.log(
-      "TRADING JOURNAL API"
-    );
 
     console.log(
-      "CONNECTION: OK"
-    );
-
-    console.log(
-      "RESPONSE:",
+      "Response:",
       result
     );
 
+
     console.log(
-      "================================="
+      "========================================"
     );
 
 
     return true;
 
-
   } catch (error) {
 
     console.error(
-      "================================="
+      "========================================"
     );
 
     console.error(
-      "TRADING JOURNAL API"
+      "TRADING JOURNAL API TEST"
     );
 
     console.error(
-      "CONNECTION: FAILED"
+      "Connection: FAILED"
     );
 
     console.error(
+      "Error:",
       error
     );
 
     console.error(
-      "================================="
+      "========================================"
     );
 
 
@@ -744,7 +1299,49 @@ async function testApiConnection() {
 
 
 /* =========================================================
-   ERROR MESSAGE
+   GET API STATUS
+========================================================= */
+
+async function checkApiConnection() {
+
+  try {
+
+    const result =
+      await getAllData();
+
+
+    return {
+
+      success:
+        true,
+
+      message:
+        "Google Apps Script terhubung.",
+
+      data:
+        result?.data || {}
+
+    };
+
+  } catch (error) {
+
+    return {
+
+      success:
+        false,
+
+      message:
+        getApiErrorMessage(error)
+
+    };
+
+  }
+
+}
+
+
+/* =========================================================
+   FORMAT ERROR
 ========================================================= */
 
 function getApiErrorMessage(
@@ -784,13 +1381,64 @@ function getApiErrorMessage(
 
 
 /* =========================================================
+   API DEBUG
+========================================================= */
+
+function debugApi() {
+
+  console.log(
+    "========================================"
+  );
+
+  console.log(
+    "TRADING JOURNAL API"
+  );
+
+  console.log(
+    "API URL:",
+    API_URL
+  );
+
+  console.log(
+    "Timeout:",
+    API_CONFIG.timeout
+  );
+
+  console.log(
+    "Content-Type:",
+    API_CONFIG.contentType
+  );
+
+  console.log(
+    "========================================"
+  );
+
+}
+
+
+/* =========================================================
    GLOBAL API OBJECT
 ========================================================= */
 
 window.TradingAPI = {
 
+  /*
+   * Core
+   */
+
   request:
     apiRequest,
+
+  post:
+    apiPost,
+
+  get:
+    apiGet,
+
+
+  /*
+   * Data
+   */
 
   getAllData:
     getAllData,
@@ -798,14 +1446,27 @@ window.TradingAPI = {
   getTransactions:
     getTransactions,
 
+  getCapital:
+    getCapital,
+
+  getReport:
+    getReport,
+
+
+  /*
+   * Transactions
+   */
+
   addTransaction:
     addTransaction,
 
   deleteTransaction:
     deleteTransaction,
 
-  getCapital:
-    getCapital,
+
+  /*
+   * Capital
+   */
 
   addCapital:
     addCapital,
@@ -813,11 +1474,24 @@ window.TradingAPI = {
   withdrawCapital:
     withdrawCapital,
 
-  getReport:
-    getReport,
+
+  /*
+   * Testing
+   */
 
   test:
     testApiConnection,
+
+  check:
+    checkApiConnection,
+
+  debug:
+    debugApi,
+
+
+  /*
+   * Error
+   */
 
   errorMessage:
     getApiErrorMessage
@@ -826,8 +1500,30 @@ window.TradingAPI = {
 
 
 /* =========================================================
-   GLOBAL TEST
+   GLOBAL SHORTCUTS
 ========================================================= */
 
 window.testTradingAPI =
   testApiConnection;
+
+
+window.debugTradingAPI =
+  debugApi;
+
+
+/* =========================================================
+   INITIAL DEBUG
+========================================================= */
+
+console.log(
+  "[TradingAPI] API loaded."
+);
+
+console.log(
+  "[TradingAPI] URL:",
+  API_URL
+);
+
+console.log(
+  "[TradingAPI] JSON mode: ENABLED"
+);
