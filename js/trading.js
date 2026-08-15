@@ -1,67 +1,33 @@
-"use strict";
-
 /* =========================================================
    TRADING JOURNAL
-   TRADING.JS
-   VERSION:
-   FULL UPDATE - STAGE 1
-   =========================================================
+   js/trading.js
+   STAGE 1 / 2
 
-   GOOGLE SHEETS TRANSAKSI:
-
-   ID
-   Tanggal
-   Saham
-   Aksi
-   Harga
-   Lot
-   Profit/Rugi
-   Nominal
-   Catatan
-   Timestamp
-
-   API:
-   window.TradingAPI
+   FUNGSI:
+   - Load data
+   - Summary
+   - Tabel transaksi
+   - Tambah transaksi
+   - Tambah modal
+   - Tarik modal
+   - Loading
+   - Toast
 ========================================================= */
+
+"use strict";
 
 
 /* =========================================================
-   GLOBAL STATE
+   STATE
 ========================================================= */
 
 const TradingState = {
 
-  transactions: [],
+  transaksi: [],
 
   modal: [],
 
-  summary: {
-
-    modalAwal: 0,
-
-    totalTambah: 0,
-
-    totalTarik: 0,
-
-    modal: 0,
-
-    totalProfit: 0,
-
-    totalRugi: 0,
-
-    netProfit: 0,
-
-    total: 0,
-
-    jumlahTransaksi: 0,
-
-    jumlahProfit: 0,
-
-    jumlahRugi: 0,
-
-    winRate: 0
-
-  },
+  summary: {},
 
   editingId: null,
 
@@ -78,17 +44,17 @@ document.addEventListener(
   "DOMContentLoaded",
   function () {
 
-    initializeTradingPage();
+    initTradingPage();
 
   }
 );
 
 
 /* =========================================================
-   INITIALIZE
+   INIT
 ========================================================= */
 
-async function initializeTradingPage() {
+async function initTradingPage() {
 
   console.log(
     "[Trading] Initializing..."
@@ -97,13 +63,17 @@ async function initializeTradingPage() {
 
   setupDefaultDates();
 
-  setupFormEvents();
+  setupProfitField();
 
-  setupModalEvents();
+  setupModalButtons();
 
-  setupProfitRugiEvents();
+  setupTransactionForm();
 
-  setupInputEvents();
+  setupModalForms();
+
+  setupCloseModal();
+
+  setupKeyboardEvents();
 
   await loadTradingData();
 
@@ -125,6 +95,16 @@ function setupDefaultDates() {
       "tanggal"
     );
 
+  const addTanggal =
+    document.getElementById(
+      "addModalTanggal"
+    );
+
+  const withdrawTanggal =
+    document.getElementById(
+      "withdrawModalTanggal"
+    );
+
 
   if (
     tanggal &&
@@ -137,12 +117,6 @@ function setupDefaultDates() {
   }
 
 
-  const addTanggal =
-    document.getElementById(
-      "addModalTanggal"
-    );
-
-
   if (
     addTanggal &&
     !addTanggal.value
@@ -152,12 +126,6 @@ function setupDefaultDates() {
       today;
 
   }
-
-
-  const withdrawTanggal =
-    document.getElementById(
-      "withdrawModalTanggal"
-    );
 
 
   if (
@@ -174,102 +142,30 @@ function setupDefaultDates() {
 
 
 /* =========================================================
-   LOAD ALL DATA
+   LOAD DATA
 ========================================================= */
 
 async function loadTradingData() {
 
-  setTransactionLoading(
-    true
+  setLoading(
+    true,
+    "Memuat data trading..."
   );
 
 
   try {
 
-    console.log(
-      "[Trading] Loading API data..."
-    );
-
-
-    if (
-      !window.TradingAPI ||
-      typeof TradingAPI.getAllData !==
-        "function"
-    ) {
-
-      throw new Error(
-        "TradingAPI belum tersedia. Pastikan api.js dimuat sebelum trading.js."
-      );
-
-    }
-
-
-    const result =
+    const data =
       await TradingAPI.getAllData();
 
 
-    console.log(
-      "[Trading] API result:",
-      result
-    );
-
-
-    if (
-      !result
-    ) {
-
-      throw new Error(
-        "Response API kosong."
-      );
-
-    }
-
-
-    if (
-      result.success === false
-    ) {
-
-      throw new Error(
-        result.message ||
-        "Gagal mengambil data Trading Journal."
-      );
-
-    }
-
-
-    const data =
-      result.data || {};
-
-
-    /*
-     * ========================================
-     * TRANSAKSI
-     * ========================================
-     */
-
-    const rawTransactions =
+    TradingState.transaksi =
       Array.isArray(
         data.transaksi
       )
         ? data.transaksi
-        : Array.isArray(
-            result.transactions
-          )
-          ? result.transactions
-          : [];
+        : [];
 
-
-    TradingState.transactions =
-      rawTransactions.map(
-        normalizeTransaction
-      );
-
-
-    /*
-     * ========================================
-     * MODAL
-     * ========================================
-     */
 
     TradingState.modal =
       Array.isArray(
@@ -279,68 +175,57 @@ async function loadTradingData() {
         : [];
 
 
-    /*
-     * ========================================
-     * SUMMARY
-     * ========================================
-     */
-
     TradingState.summary =
-      normalizeSummary(
-        data.summary ||
-        result.summary ||
-        {}
-      );
+      data.summary &&
+      typeof data.summary === "object"
+        ? data.summary
+        : {};
 
-
-    console.log(
-      "[Trading] Transactions:",
-      TradingState.transactions
-    );
-
-
-    console.log(
-      "[Trading] Summary:",
-      TradingState.summary
-    );
-
-
-    /*
-     * ========================================
-     * RENDER
-     * ========================================
-     */
 
     renderSummary();
 
-    renderRecentTransactions();
+    renderTransactions();
+
+
+    console.log(
+      "[Trading] Data loaded:",
+      data
+    );
 
 
   } catch (error) {
 
     console.error(
-      "[Trading] LOAD ERROR:",
+      "[Trading] Load error:",
       error
     );
 
 
-    TradingState.transactions =
+    TradingState.transaksi =
       [];
 
+    TradingState.modal =
+      [];
 
-    renderRecentTransactions();
+    TradingState.summary =
+      {};
+
+
+    renderSummary();
+
+    renderTransactions();
 
 
     showToast(
       "error",
-      "Gagal Memuat Data",
+      "Gagal memuat",
       getErrorMessage(error)
     );
 
 
   } finally {
 
-    setTransactionLoading(
+    setLoading(
       false
     );
 
@@ -350,334 +235,18 @@ async function loadTradingData() {
 
 
 /* =========================================================
-   NORMALIZE TRANSACTION
+   REFRESH
 ========================================================= */
 
-/**
- * Google Sheets backend mengembalikan:
- *
- * {
- *   ID: "...",
- *   Tanggal: "...",
- *   Saham: "...",
- *   Aksi: "...",
- *   Harga: 8200,
- *   Lot: 10,
- *   "Profit/Rugi": "PROFIT",
- *   Nominal: 300000,
- *   Catatan: "...",
- *   Timestamp: "..."
- * }
- *
- * Kita ubah menjadi object internal.
- *
- * Header Google Sheet TIDAK diubah.
- */
+async function refreshTradingData() {
 
-function normalizeTransaction(
-  row
-) {
-
-  if (
-    !row ||
-    typeof row !== "object"
-  ) {
-
-    return {
-
-      ID: "",
-
-      Tanggal: "",
-
-      Saham: "",
-
-      Aksi: "",
-
-      Harga: 0,
-
-      Lot: 0,
-
-      "Profit/Rugi": "",
-
-      Nominal: 0,
-
-      Catatan: "",
-
-      Timestamp: "",
-
-      _id: "",
-
-      _tanggal: "",
-
-      _saham: "",
-
-      _aksi: "",
-
-      _harga: 0,
-
-      _lot: 0,
-
-      _profitRugi: "",
-
-      _nominal: 0,
-
-      _catatan: "",
-
-      _timestamp: ""
-
-    };
-
-  }
-
-
-  /*
-   * ========================================
-   * FIELD ASLI GOOGLE SHEETS
-   * ========================================
-   */
-
-  const ID =
-    String(
-      row.ID ??
-      row.id ??
-      ""
-    ).trim();
-
-
-  const Tanggal =
-    String(
-      row.Tanggal ??
-      row.tanggal ??
-      ""
-    ).trim();
-
-
-  const Saham =
-    String(
-      row.Saham ??
-      row.saham ??
-      ""
-    )
-    .trim()
-    .toUpperCase();
-
-
-  const Aksi =
-    String(
-      row.Aksi ??
-      row.aksi ??
-      ""
-    )
-    .trim()
-    .toUpperCase();
-
-
-  const Harga =
-    toNumber(
-      row.Harga ??
-      row.harga
-    );
-
-
-  const Lot =
-    toNumber(
-      row.Lot ??
-      row.lot
-    );
-
-
-  const profitRugi =
-    String(
-      row["Profit/Rugi"] ??
-      row.profitRugi ??
-      row.hasil ??
-      ""
-    )
-    .trim()
-    .toUpperCase();
-
-
-  const Nominal =
-    toNumber(
-      row.Nominal ??
-      row.nominal
-    );
-
-
-  const Catatan =
-    String(
-      row.Catatan ??
-      row.catatan ??
-      ""
-    ).trim();
-
-
-  const Timestamp =
-    String(
-      row.Timestamp ??
-      row.timestamp ??
-      ""
-    ).trim();
-
-
-  /*
-   * ========================================
-   * SIMPAN FIELD ASLI
-   * ========================================
-   */
-
-  return {
-
-    ID:
-      ID,
-
-    Tanggal:
-      Tanggal,
-
-    Saham:
-      Saham,
-
-    Aksi:
-      Aksi,
-
-    Harga:
-      Harga,
-
-    Lot:
-      Lot,
-
-    "Profit/Rugi":
-      profitRugi,
-
-    Nominal:
-      Nominal,
-
-    Catatan:
-      Catatan,
-
-    Timestamp:
-      Timestamp,
-
-
-    /*
-     * Internal alias.
-     *
-     * Dipakai oleh trading.js supaya
-     * lebih mudah.
-     */
-
-    _id:
-      ID,
-
-    _tanggal:
-      Tanggal,
-
-    _saham:
-      Saham,
-
-    _aksi:
-      Aksi,
-
-    _harga:
-      Harga,
-
-    _lot:
-      Lot,
-
-    _profitRugi:
-      profitRugi,
-
-    _nominal:
-      Nominal,
-
-    _catatan:
-      Catatan,
-
-    _timestamp:
-      Timestamp
-
-  };
+  await loadTradingData();
 
 }
 
 
 /* =========================================================
-   NORMALIZE SUMMARY
-========================================================= */
-
-function normalizeSummary(
-  summary
-) {
-
-  return {
-
-    modalAwal:
-      toNumber(
-        summary.modalAwal
-      ),
-
-    totalTambah:
-      toNumber(
-        summary.totalTambah
-      ),
-
-    totalTarik:
-      toNumber(
-        summary.totalTarik
-      ),
-
-    modal:
-      toNumber(
-        summary.modal
-      ),
-
-    totalProfit:
-      toNumber(
-        summary.totalProfit
-      ),
-
-    totalRugi:
-      toNumber(
-        summary.totalRugi
-      ),
-
-    netProfit:
-      toNumber(
-        summary.netProfit
-      ),
-
-    total:
-      toNumber(
-        summary.total
-      ),
-
-    jumlahTransaksi:
-      toNumber(
-        summary.jumlahTransaksi
-      ),
-
-    jumlahProfit:
-      toNumber(
-        summary.jumlahProfit
-      ),
-
-    jumlahRugi:
-      toNumber(
-        summary.jumlahRugi
-      ),
-
-    winRate:
-      toNumber(
-        summary.winRate
-      )
-
-  };
-
-}
-
-
-/* =========================================================
-   RENDER SUMMARY
+   SUMMARY
 ========================================================= */
 
 function renderSummary() {
@@ -686,45 +255,9 @@ function renderSummary() {
     TradingState.summary || {};
 
 
-  /*
-   * MODAL
-   */
-
-  const modalValue =
-    document.getElementById(
-      "modalValue"
-    );
-
-
-  if (modalValue) {
-
-    modalValue.textContent =
-      formatRupiah(
-        summary.modal
-      );
-
-  }
-
-
-  /*
-   * PROFIT / LOSS
-   */
-
-  const profitLossValue =
-    document.getElementById(
-      "profitLossValue"
-    );
-
-
-  const profitLossDescription =
-    document.getElementById(
-      "profitLossDescription"
-    );
-
-
-  const profitIcon =
-    document.getElementById(
-      "profitIcon"
+  const modal =
+    toNumber(
+      summary.modal
     );
 
 
@@ -734,37 +267,51 @@ function renderSummary() {
     );
 
 
-  if (profitLossValue) {
-
-    profitLossValue.textContent =
-      formatRupiah(
-        netProfit
-      );
-
-  }
+  const total =
+    toNumber(
+      summary.total
+    );
 
 
-  if (
-    profitLossDescription
-  ) {
+  setText(
+    "modalValue",
+    formatRupiah(modal)
+  );
+
+
+  setText(
+    "profitLossValue",
+    formatRupiah(netProfit)
+  );
+
+
+  setText(
+    "totalValue",
+    formatRupiah(total)
+  );
+
+
+  const profitDescription =
+    document.getElementById(
+      "profitLossDescription"
+    );
+
+
+  if (profitDescription) {
 
     if (netProfit > 0) {
 
-      profitLossDescription.textContent =
-        "Net profit trading";
+      profitDescription.textContent =
+        "Net profit";
 
-    }
+    } else if (netProfit < 0) {
 
-    else if (netProfit < 0) {
+      profitDescription.textContent =
+        "Net loss";
 
-      profitLossDescription.textContent =
-        "Net loss trading";
+    } else {
 
-    }
-
-    else {
-
-      profitLossDescription.textContent =
+      profitDescription.textContent =
         "Net hasil trading";
 
     }
@@ -772,7 +319,19 @@ function renderSummary() {
   }
 
 
+  const profitIcon =
+    document.getElementById(
+      "profitIcon"
+    );
+
+
   if (profitIcon) {
+
+    profitIcon.classList.remove(
+      "profit-positive",
+      "profit-negative"
+    );
+
 
     if (netProfit > 0) {
 
@@ -783,13 +342,7 @@ function renderSummary() {
         "profit-positive"
       );
 
-      profitIcon.classList.remove(
-        "profit-negative"
-      );
-
-    }
-
-    else if (netProfit < 0) {
+    } else if (netProfit < 0) {
 
       profitIcon.textContent =
         "↘";
@@ -798,24 +351,10 @@ function renderSummary() {
         "profit-negative"
       );
 
-      profitIcon.classList.remove(
-        "profit-positive"
-      );
-
-    }
-
-    else {
+    } else {
 
       profitIcon.textContent =
         "→";
-
-      profitIcon.classList.remove(
-        "profit-positive"
-      );
-
-      profitIcon.classList.remove(
-        "profit-negative"
-      );
 
     }
 
@@ -823,21 +362,39 @@ function renderSummary() {
 
 
   /*
-   * TOTAL
+   * Warna nilai profit/loss.
    */
 
-  const totalValue =
+  const profitValue =
     document.getElementById(
-      "totalValue"
+      "profitLossValue"
     );
 
 
-  if (totalValue) {
+  if (profitValue) {
 
-    totalValue.textContent =
-      formatRupiah(
-        summary.total
+    profitValue.classList.remove(
+      "profit-positive",
+      "profit-negative"
+    );
+
+
+    if (netProfit > 0) {
+
+      profitValue.classList.add(
+        "profit-positive"
       );
+
+    }
+
+
+    if (netProfit < 0) {
+
+      profitValue.classList.add(
+        "profit-negative"
+      );
+
+    }
 
   }
 
@@ -845,10 +402,10 @@ function renderSummary() {
 
 
 /* =========================================================
-   RENDER RECENT TRANSACTIONS
+   RENDER TRANSACTIONS
 ========================================================= */
 
-function renderRecentTransactions() {
+function renderTransactions() {
 
   const loading =
     document.getElementById(
@@ -885,28 +442,25 @@ function renderRecentTransactions() {
   }
 
 
-  /*
-   * Bersihkan tabel.
-   */
-
   tbody.innerHTML =
     "";
 
 
-  /*
-   * Ambil maksimal 10 terbaru.
-   */
+  if (loading) {
+
+    loading.classList.add(
+      "hidden"
+    );
+
+  }
+
 
   const transactions =
-    TradingState.transactions
-      .slice()
-      .sort(
-        compareTransactionDate
-      )
-      .slice(
-        0,
-        10
-      );
+    Array.isArray(
+      TradingState.transaksi
+    )
+      ? TradingState.transaksi
+      : [];
 
 
   if (
@@ -954,392 +508,87 @@ function renderRecentTransactions() {
   }
 
 
-  transactions.forEach(
-    function(transaction) {
+  /*
+   * Ambil maksimal transaksi terbaru.
+   */
 
-      const row =
-        document.createElement(
-          "tr"
-        );
-
-
-      /*
-       * TANGGAL
-       */
-
-      const dateCell =
-        document.createElement(
-          "td"
-        );
-
-      dateCell.textContent =
-        formatDisplayDate(
-          transaction._tanggal
-        );
-
-
-      /*
-       * SAHAM
-       */
-
-      const stockCell =
-        document.createElement(
-          "td"
-        );
-
-
-      const stockStrong =
-        document.createElement(
-          "strong"
-        );
-
-      stockStrong.textContent =
-        transaction._saham || "-";
-
-
-      stockCell.appendChild(
-        stockStrong
+  const recent =
+    transactions
+      .slice()
+      .reverse()
+      .slice(
+        0,
+        10
       );
 
 
-      /*
-       * AKSI
-       */
-
-      const actionCell =
-        document.createElement(
-          "td"
-        );
-
-
-      const actionBadge =
-        document.createElement(
-          "span"
-        );
-
-
-      actionBadge.textContent =
-        transaction._aksi || "-";
-
-
-      actionBadge.className =
-        "transaction-action " +
-        (
-          transaction._aksi === "BUY"
-            ? "buy"
-            : "sell"
-        );
-
-
-      actionCell.appendChild(
-        actionBadge
-      );
-
-
-      /*
-       * HARGA
-       */
-
-      const priceCell =
-        document.createElement(
-          "td"
-        );
-
-
-      priceCell.textContent =
-        formatNumber(
-          transaction._harga
-        );
-
-
-      /*
-       * LOT
-       */
-
-      const lotCell =
-        document.createElement(
-          "td"
-        );
-
-
-      lotCell.textContent =
-        formatNumber(
-          transaction._lot
-        );
-
-
-      /*
-       * HASIL
-       */
-
-      const resultCell =
-        document.createElement(
-          "td"
-        );
-
-
-      if (
-        transaction._profitRugi
-      ) {
-
-        const resultBadge =
-          document.createElement(
-            "span"
-          );
-
-
-        resultBadge.textContent =
-          transaction._profitRugi;
-
-
-        resultBadge.className =
-          "transaction-result " +
-          (
-            transaction._profitRugi ===
-            "PROFIT"
-              ? "profit"
-              : "loss"
-          );
-
-
-        resultCell.appendChild(
-          resultBadge
-        );
-
-      }
-
-      else {
-
-        resultCell.textContent =
-          "-";
-
-      }
-
-
-      /*
-       * NOMINAL
-       */
-
-      const nominalCell =
-        document.createElement(
-          "td"
-        );
-
-
-      nominalCell.textContent =
-        transaction._nominal > 0
-          ? formatRupiah(
-              transaction._nominal
-            )
-          : "-";
-
-
-      /*
-       * CATATAN
-       */
-
-      /*
-       * CATATAN tidak ditampilkan
-       * di tabel utama karena HTML
-       * saat ini hanya menyediakan
-       * 7 kolom.
-       *
-       * Tetap disimpan di object.
-       */
-
-
-      row.appendChild(
-        dateCell
-      );
-
-      row.appendChild(
-        stockCell
-      );
-
-      row.appendChild(
-        actionCell
-      );
-
-      row.appendChild(
-        priceCell
-      );
-
-      row.appendChild(
-        lotCell
-      );
-
-      row.appendChild(
-        resultCell
-      );
-
-      row.appendChild(
-        nominalCell
-      );
-
-
-      /*
-       * Simpan ID di DOM.
-       */
-
-      row.dataset.transactionId =
-        transaction._id;
-
+  recent.forEach(
+    function (transaction) {
 
       tbody.appendChild(
-        row
+        createTransactionRow(
+          transaction
+        )
       );
 
     }
   );
 
-}
 
-
-/* =========================================================
-   SETUP FORM EVENTS
-========================================================= */
-
-function setupFormEvents() {
-
-  const transactionForm =
-    document.getElementById(
-      "transactionForm"
-    );
-
-
-  if (transactionForm) {
-
-    transactionForm.addEventListener(
-      "submit",
-      handleTransactionSubmit
-    );
-
-  }
-
-
-  const addModalForm =
-    document.getElementById(
-      "addModalForm"
-    );
-
-
-  if (addModalForm) {
-
-    addModalForm.addEventListener(
-      "submit",
-      handleAddModalSubmit
-    );
-
-  }
-
-
-  const withdrawModalForm =
-    document.getElementById(
-      "withdrawModalForm"
-    );
-
-
-  if (withdrawModalForm) {
-
-    withdrawModalForm.addEventListener(
-      "submit",
-      handleWithdrawModalSubmit
-    );
-
-  }
-
-
-  const addModalButton =
-    document.getElementById(
-      "addModalButton"
-    );
-
-
-  if (addModalButton) {
-
-    addModalButton.addEventListener(
-      "click",
-      function() {
-
-        openModal(
-          "addModal"
-        );
-
-      }
-    );
-
-  }
-
-
-  const withdrawModalButton =
-    document.getElementById(
-      "withdrawModalButton"
-    );
-
-
-  if (withdrawModalButton) {
-
-    withdrawModalButton.addEventListener(
-      "click",
-      function() {
-
-        openModal(
-          "withdrawModal"
-        );
-
-      }
-    );
-
-  }
+  addActionHeaderIfNeeded();
 
 }
 
 
 /* =========================================================
-   TRANSACTION SUBMIT
+   CREATE TRANSACTION ROW
 ========================================================= */
 
-async function handleTransactionSubmit(
-  event
+function createTransactionRow(
+  transaction
 ) {
 
-  event.preventDefault();
+  const row =
+    document.createElement(
+      "tr"
+    );
 
 
-  if (
-    TradingState.loading
-  ) {
-
-    return;
-
-  }
+  const id =
+    getTransactionId(
+      transaction
+    );
 
 
   const tanggal =
-    getElementValue(
+    getField(
+      transaction,
+      "Tanggal",
       "tanggal"
     );
 
 
   const saham =
-    getElementValue(
+    getField(
+      transaction,
+      "Saham",
       "saham"
-    )
-    .trim()
-    .toUpperCase();
+    );
 
 
   const aksi =
-    getElementValue(
+    getField(
+      transaction,
+      "Aksi",
       "aksi"
-    )
-    .trim()
-    .toUpperCase();
+    );
 
 
   const harga =
     toNumber(
-      getElementValue(
+      getField(
+        transaction,
+        "Harga",
         "harga"
       )
     );
@@ -1347,60 +596,176 @@ async function handleTransactionSubmit(
 
   const lot =
     toNumber(
-      getElementValue(
+      getField(
+        transaction,
+        "Lot",
         "lot"
       )
     );
 
 
-  const profitRugi =
-    getElementValue(
+  const hasil =
+    getField(
+      transaction,
+      "Profit/Rugi",
       "profitRugi"
-    )
-    .trim()
-    .toUpperCase();
+    );
 
 
   const nominal =
     toNumber(
-      getElementValue(
+      getField(
+        transaction,
+        "Nominal",
         "nominal"
       )
     );
 
 
-  const catatan =
-    getElementValue(
-      "catatan"
-    ).trim();
+  row.innerHTML = `
+
+    <td>
+      ${escapeHtml(
+        formatDisplayDate(tanggal)
+      )}
+    </td>
+
+    <td>
+      <strong>
+        ${escapeHtml(
+          saham || "-"
+        )}
+      </strong>
+    </td>
+
+    <td>
+      <span class="action-badge ${getActionClass(aksi)}">
+        ${escapeHtml(
+          aksi || "-"
+        )}
+      </span>
+    </td>
+
+    <td>
+      ${formatNumber(harga)}
+    </td>
+
+    <td>
+      ${formatNumber(lot)}
+    </td>
+
+    <td>
+      ${createResultBadge(
+        hasil,
+        nominal
+      )}
+    </td>
+
+    <td>
+      ${hasil
+        ? formatRupiah(nominal)
+        : "-"
+      }
+    </td>
+
+    <td class="transaction-actions-cell">
+
+      <button
+        type="button"
+        class="table-action-button edit-transaction-button"
+        data-id="${escapeAttribute(id)}"
+      >
+        Edit
+      </button>
+
+      <button
+        type="button"
+        class="table-action-button delete-transaction-button"
+        data-id="${escapeAttribute(id)}"
+      >
+        Hapus
+      </button>
+
+    </td>
+
+  `;
 
 
-  /*
-   * ========================================
-   * VALIDASI
-   * ========================================
-   */
-
-  if (!tanggal) {
-
-    showToast(
-      "error",
-      "Data Belum Lengkap",
-      "Tanggal transaksi wajib diisi."
+  const editButton =
+    row.querySelector(
+      ".edit-transaction-button"
     );
+
+
+  const deleteButton =
+    row.querySelector(
+      ".delete-transaction-button"
+    );
+
+
+  if (editButton) {
+
+    editButton.addEventListener(
+      "click",
+      function () {
+
+        handleEditTransaction(
+          id
+        );
+
+      }
+    );
+
+  }
+
+
+  if (deleteButton) {
+
+    deleteButton.addEventListener(
+      "click",
+      function () {
+
+        handleDeleteTransaction(
+          id
+        );
+
+      }
+    );
+
+  }
+
+
+  return row;
+
+}
+
+
+/* =========================================================
+   ACTION HEADER
+========================================================= */
+
+function addActionHeaderIfNeeded() {
+
+  const table =
+    document.querySelector(
+      ".transaction-table"
+    );
+
+
+  if (!table) {
 
     return;
 
   }
 
 
-  if (!saham) {
-
-    showToast(
-      "error",
-      "Data Belum Lengkap",
-      "Kode saham wajib diisi."
+  const headerRow =
+    table.querySelector(
+      "thead tr"
     );
+
+
+  if (!headerRow) {
 
     return;
 
@@ -1408,204 +773,607 @@ async function handleTransactionSubmit(
 
 
   if (
-    aksi !== "BUY" &&
-    aksi !== "SELL"
+    headerRow.querySelector(
+      ".actions-header"
+    )
   ) {
-
-    showToast(
-      "error",
-      "Aksi Tidak Valid",
-      "Aksi harus BUY atau SELL."
-    );
 
     return;
 
   }
 
 
-  if (
-    harga <= 0
-  ) {
-
-    showToast(
-      "error",
-      "Harga Tidak Valid",
-      "Harga harus lebih besar dari 0."
+  const th =
+    document.createElement(
+      "th"
     );
+
+
+  th.className =
+    "actions-header";
+
+
+  th.textContent =
+    "Aksi";
+
+
+  headerRow.appendChild(
+    th
+  );
+
+}
+
+
+/* =========================================================
+   RESULT BADGE
+========================================================= */
+
+function createResultBadge(
+  hasil,
+  nominal
+) {
+
+  const value =
+    String(
+      hasil || ""
+    )
+    .trim()
+    .toUpperCase();
+
+
+  if (!value) {
+
+    return `
+      <span class="result-badge">
+        -
+      </span>
+    `;
+
+  }
+
+
+  if (value === "PROFIT") {
+
+    return `
+      <span class="result-badge result-profit">
+        PROFIT
+      </span>
+    `;
+
+  }
+
+
+  if (value === "RUGI") {
+
+    return `
+      <span class="result-badge result-loss">
+        RUGI
+      </span>
+    `;
+
+  }
+
+
+  return `
+    <span class="result-badge">
+      ${escapeHtml(value)}
+    </span>
+  `;
+
+}
+
+
+/* =========================================================
+   ACTION CLASS
+========================================================= */
+
+function getActionClass(
+  aksi
+) {
+
+  const value =
+    String(
+      aksi || ""
+    )
+    .toUpperCase();
+
+
+  if (value === "BUY") {
+
+    return "action-buy";
+
+  }
+
+
+  if (value === "SELL") {
+
+    return "action-sell";
+
+  }
+
+
+  return "";
+
+}
+
+
+/* =========================================================
+   TRANSACTION FORM
+========================================================= */
+
+function setupTransactionForm() {
+
+  const form =
+    document.getElementById(
+      "transactionForm"
+    );
+
+
+  if (!form) {
 
     return;
 
   }
 
 
-  if (
-    lot <= 0
-  ) {
+  form.addEventListener(
+    "submit",
+    async function (event) {
 
-    showToast(
-      "error",
-      "Lot Tidak Valid",
-      "Lot harus lebih besar dari 0."
+      event.preventDefault();
+
+
+      await handleTransactionSubmit(
+        form
+      );
+
+    }
+  );
+
+}
+
+
+/* =========================================================
+   SUBMIT TRANSACTION
+========================================================= */
+
+async function handleTransactionSubmit(
+  form
+) {
+
+  const button =
+    document.getElementById(
+      "saveTransactionButton"
     );
 
-    return;
 
-  }
-
-
-  if (
-    profitRugi !== "" &&
-    profitRugi !== "PROFIT" &&
-    profitRugi !== "RUGI"
-  ) {
-
-    showToast(
-      "error",
-      "Hasil Tidak Valid",
-      "Hasil harus PROFIT atau RUGI."
-    );
-
-    return;
-
-  }
-
-
-  if (
-    profitRugi !== "" &&
-    nominal <= 0
-  ) {
-
-    showToast(
-      "error",
-      "Nominal Belum Diisi",
-      "Nominal wajib diisi jika PROFIT/RUGI dipilih."
-    );
-
-    return;
-
-  }
-
-
-  /*
-   * ========================================
-   * PAYLOAD
-   * ========================================
-   *
-   * Nama field mengikuti Apps Script.
-   */
-
-  const transaction = {
+  const data = {
 
     tanggal:
-      tanggal,
+      getInputValue(
+        "tanggal"
+      ),
 
     saham:
-      saham,
+      getInputValue(
+        "saham"
+      )
+      .toUpperCase(),
 
     aksi:
-      aksi,
+      getInputValue(
+        "aksi"
+      )
+      .toUpperCase(),
 
     harga:
-      harga,
+      getInputNumber(
+        "harga"
+      ),
 
     lot:
-      lot,
+      getInputNumber(
+        "lot"
+      ),
 
     profitRugi:
-      profitRugi,
+      getInputValue(
+        "profitRugi"
+      )
+      .toUpperCase(),
 
     nominal:
-      profitRugi
-        ? nominal
-        : 0,
+      getInputNumber(
+        "nominal"
+      ),
 
     catatan:
-      catatan
+      getInputValue(
+        "catatan"
+      )
 
   };
 
 
-  setGlobalLoading(
-    true,
-    "Menyimpan transaksi..."
-  );
-
-
-  TradingState.loading =
-    true;
-
-
   try {
 
-    const result =
-      await TradingAPI.addTransaction(
-        transaction
-      );
-
-
-    console.log(
-      "[Trading] Add transaction response:",
-      result
+    setButtonLoading(
+      button,
+      true,
+      "Menyimpan..."
     );
 
 
+    /*
+     * Kalau sedang edit.
+     */
+
     if (
-      result &&
-      result.success === false
+      TradingState.editingId
     ) {
 
-      throw new Error(
-        result.message ||
-        "Transaksi gagal disimpan."
+      await TradingAPI.updateTransaction(
+        TradingState.editingId,
+        data
+      );
+
+
+      showToast(
+        "success",
+        "Berhasil",
+        "Transaksi berhasil diperbarui."
+      );
+
+
+    } else {
+
+      await TradingAPI.addTransaction(
+        data
+      );
+
+
+      showToast(
+        "success",
+        "Berhasil",
+        "Transaksi berhasil disimpan."
       );
 
     }
 
 
-    /*
-     * Reset form.
-     */
-
     resetTransactionForm();
 
+    TradingState.editingId =
+      null;
 
-    /*
-     * Ambil data terbaru dari
-     * Google Sheets.
-     */
 
     await loadTradingData();
-
-
-    showToast(
-      "success",
-      "Berhasil",
-      "Transaksi berhasil disimpan."
-    );
 
 
   } catch (error) {
 
     console.error(
-      "[Trading] ADD TRANSACTION ERROR:",
+      "[Trading] Save transaction error:",
       error
     );
 
 
     showToast(
       "error",
-      "Gagal Menyimpan",
+      "Gagal",
       getErrorMessage(error)
     );
 
 
   } finally {
 
-    TradingState.loading =
-      false;
+    setButtonLoading(
+      button,
+      false,
+      "Simpan Transaksi"
+    );
+
+  }
+
+}
 
 
-    setGlobalLoading(
+/* =========================================================
+   EDIT TRANSACTION
+========================================================= */
+
+function handleEditTransaction(
+  id
+) {
+
+  if (!id) {
+
+    showToast(
+      "error",
+      "Gagal",
+      "ID transaksi tidak ditemukan."
+    );
+
+    return;
+
+  }
+
+
+  const transaction =
+    TradingState.transaksi.find(
+      function (item) {
+
+        return (
+          String(
+            getTransactionId(
+              item
+            )
+          ) ===
+          String(id)
+        );
+
+      }
+    );
+
+
+  if (!transaction) {
+
+    showToast(
+      "error",
+      "Gagal",
+      "Data transaksi tidak ditemukan."
+    );
+
+    return;
+
+  }
+
+
+  TradingState.editingId =
+    id;
+
+
+  setInputValue(
+    "tanggal",
+    getField(
+      transaction,
+      "Tanggal",
+      "tanggal"
+    )
+  );
+
+
+  setInputValue(
+    "saham",
+    getField(
+      transaction,
+      "Saham",
+      "saham"
+    )
+  );
+
+
+  setInputValue(
+    "aksi",
+    getField(
+      transaction,
+      "Aksi",
+      "aksi"
+    )
+  );
+
+
+  setInputValue(
+    "harga",
+    getField(
+      transaction,
+      "Harga",
+      "harga"
+    )
+  );
+
+
+  setInputValue(
+    "lot",
+    getField(
+      transaction,
+      "Lot",
+      "lot"
+    )
+  );
+
+
+  setInputValue(
+    "profitRugi",
+    getField(
+      transaction,
+      "Profit/Rugi",
+      "profitRugi"
+    )
+  );
+
+
+  setInputValue(
+    "nominal",
+    getField(
+      transaction,
+      "Nominal",
+      "nominal"
+    )
+  );
+
+
+  setInputValue(
+    "catatan",
+    getField(
+      transaction,
+      "Catatan",
+      "catatan"
+    )
+  );
+
+
+  updateNominalVisibility();
+
+
+  const button =
+    document.getElementById(
+      "saveTransactionButton"
+    );
+
+
+  if (button) {
+
+    const span =
+      button.querySelector(
+        "span:first-child"
+      );
+
+
+    if (span) {
+
+      span.textContent =
+        "Update Transaksi";
+
+    } else {
+
+      button.textContent =
+        "Update Transaksi";
+
+    }
+
+  }
+
+
+  const panel =
+    document.querySelector(
+      ".transaction-panel"
+    );
+
+
+  if (panel) {
+
+    panel.scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    });
+
+  }
+
+
+  showToast(
+    "success",
+    "Mode Edit",
+    "Silakan ubah data transaksi."
+  );
+
+}
+
+
+/* =========================================================
+   DELETE TRANSACTION
+========================================================= */
+
+async function handleDeleteTransaction(
+  id
+) {
+
+  if (!id) {
+
+    showToast(
+      "error",
+      "Gagal",
+      "ID transaksi tidak ditemukan."
+    );
+
+    return;
+
+  }
+
+
+  const transaction =
+    TradingState.transaksi.find(
+      function (item) {
+
+        return (
+          String(
+            getTransactionId(
+              item
+            )
+          ) ===
+          String(id)
+        );
+
+      }
+    );
+
+
+  const saham =
+    transaction
+      ? getField(
+          transaction,
+          "Saham",
+          "saham"
+        )
+      : "transaksi ini";
+
+
+  const confirmed =
+    window.confirm(
+      "Hapus transaksi " +
+      saham +
+      "?\n\nData yang dihapus tidak dapat dikembalikan."
+    );
+
+
+  if (!confirmed) {
+
+    return;
+
+  }
+
+
+  try {
+
+    setLoading(
+      true,
+      "Menghapus transaksi..."
+    );
+
+
+    await TradingAPI.deleteTransaction(
+      id
+    );
+
+
+    showToast(
+      "success",
+      "Berhasil",
+      "Transaksi berhasil dihapus."
+    );
+
+
+    await loadTradingData();
+
+
+  } catch (error) {
+
+    console.error(
+      "[Trading] Delete error:",
+      error
+    );
+
+
+    showToast(
+      "error",
+      "Gagal menghapus",
+      getErrorMessage(error)
+    );
+
+
+  } finally {
+
+    setLoading(
       false
     );
 
@@ -1615,7 +1383,7 @@ async function handleTransactionSubmit(
 
 
 /* =========================================================
-   RESET TRANSACTION FORM
+   RESET FORM
 ========================================================= */
 
 function resetTransactionForm() {
@@ -1633,47 +1401,56 @@ function resetTransactionForm() {
   }
 
 
-  setupDefaultDates();
+  TradingState.editingId =
+    null;
 
 
-  const aksi =
-    document.getElementById(
-      "aksi"
-    );
+  setInputValue(
+    "tanggal",
+    getTodayString()
+  );
 
 
-  if (aksi) {
-
-    aksi.value =
-      "BUY";
-
-  }
-
-
-  const profitRugi =
-    document.getElementById(
-      "profitRugi"
-    );
-
-
-  if (profitRugi) {
-
-    profitRugi.value =
-      "";
-
-  }
+  setInputValue(
+    "profitRugi",
+    ""
+  );
 
 
   updateNominalVisibility();
+
+
+  const button =
+    document.getElementById(
+      "saveTransactionButton"
+    );
+
+
+  if (button) {
+
+    const span =
+      button.querySelector(
+        "span:first-child"
+      );
+
+
+    if (span) {
+
+      span.textContent =
+        "Simpan Transaksi";
+
+    }
+
+  }
 
 }
 
 
 /* =========================================================
-   PROFIT/RUGI EVENTS
+   PROFIT FIELD
 ========================================================= */
 
-function setupProfitRugiEvents() {
+function setupProfitField() {
 
   const select =
     document.getElementById(
@@ -1717,16 +1494,13 @@ function updateNominalVisibility() {
     );
 
 
-  const nominal =
+  const input =
     document.getElementById(
       "nominal"
     );
 
 
-  if (
-    !select ||
-    !group
-  ) {
+  if (!select) {
 
     return;
 
@@ -1734,39 +1508,46 @@ function updateNominalVisibility() {
 
 
   const value =
-    select.value;
+    String(
+      select.value || ""
+    )
+    .toUpperCase();
 
 
-  if (
+  const hasResult =
     value === "PROFIT" ||
-    value === "RUGI"
-  ) {
-
-    group.classList.remove(
-      "hidden"
-    );
+    value === "RUGI";
 
 
-    if (nominal) {
+  if (group) {
 
-      nominal.required =
-        true;
+    if (hasResult) {
+
+      group.classList.remove(
+        "hidden"
+      );
+
+    } else {
+
+      group.classList.add(
+        "hidden"
+      );
 
     }
 
   }
 
-  else {
 
-    group.classList.remove(
-      "hidden"
-    );
+  if (input) {
+
+    input.required =
+      hasResult;
 
 
-    if (nominal) {
+    if (!hasResult) {
 
-      nominal.required =
-        false;
+      input.value =
+        "";
 
     }
 
@@ -1776,26 +1557,32 @@ function updateNominalVisibility() {
 
 
 /* =========================================================
-   INPUT EVENTS
+   MODAL BUTTONS
 ========================================================= */
 
-function setupInputEvents() {
+function setupModalButtons() {
 
-  const saham =
+  const addButton =
     document.getElementById(
-      "saham"
+      "addModalButton"
     );
 
 
-  if (saham) {
+  const withdrawButton =
+    document.getElementById(
+      "withdrawModalButton"
+    );
 
-    saham.addEventListener(
-      "input",
-      function() {
 
-        this.value =
-          this.value
-            .toUpperCase();
+  if (addButton) {
+
+    addButton.addEventListener(
+      "click",
+      function () {
+
+        openModal(
+          "addModal"
+        );
 
       }
     );
@@ -1803,49 +1590,170 @@ function setupInputEvents() {
   }
 
 
-  const harga =
+  if (withdrawButton) {
+
+    withdrawButton.addEventListener(
+      "click",
+      function () {
+
+        openModal(
+          "withdrawModal"
+        );
+
+      }
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   MODAL FORMS
+========================================================= */
+
+function setupModalForms() {
+
+  const addForm =
     document.getElementById(
-      "harga"
+      "addModalForm"
     );
 
 
-  if (harga) {
+  const withdrawForm =
+    document.getElementById(
+      "withdrawModalForm"
+    );
 
-    harga.addEventListener(
-      "input",
-      sanitizeNumericInput
+
+  if (addForm) {
+
+    addForm.addEventListener(
+      "submit",
+      async function (event) {
+
+        event.preventDefault();
+
+        await handleAddCapital(
+          addForm
+        );
+
+      }
     );
 
   }
 
 
-  const lot =
-    document.getElementById(
-      "lot"
-    );
+  if (withdrawForm) {
 
+    withdrawForm.addEventListener(
+      "submit",
+      async function (event) {
 
-  if (lot) {
+        event.preventDefault();
 
-    lot.addEventListener(
-      "input",
-      sanitizeNumericInput
+        await handleWithdrawCapital(
+          withdrawForm
+        );
+
+      }
     );
 
   }
+
+}
+
+
+/* =========================================================
+   ADD CAPITAL
+========================================================= */
+
+async function handleAddCapital(
+  form
+) {
+
+  const button =
+    document.getElementById(
+      "saveAddModalButton"
+    );
+
+
+  const tanggal =
+    getInputValue(
+      "addModalTanggal"
+    );
 
 
   const nominal =
-    document.getElementById(
-      "nominal"
+    getInputNumber(
+      "addModalNominal"
     );
 
 
-  if (nominal) {
+  const catatan =
+    getInputValue(
+      "addModalCatatan"
+    );
 
-    nominal.addEventListener(
-      "input",
-      sanitizeNumericInput
+
+  try {
+
+    setButtonLoading(
+      button,
+      true,
+      "Menyimpan..."
+    );
+
+
+    await TradingAPI.addCapital(
+      nominal,
+      catatan,
+      tanggal
+    );
+
+
+    closeAllModals();
+
+    form.reset();
+
+
+    setInputValue(
+      "addModalTanggal",
+      getTodayString()
+    );
+
+
+    showToast(
+      "success",
+      "Berhasil",
+      "Modal berhasil ditambahkan."
+    );
+
+
+    await loadTradingData();
+
+
+  } catch (error) {
+
+    console.error(
+      "[Trading] Add capital error:",
+      error
+    );
+
+
+    showToast(
+      "error",
+      "Gagal",
+      getErrorMessage(error)
+    );
+
+
+  } finally {
+
+    setButtonLoading(
+      button,
+      false,
+      "Simpan"
     );
 
   }
@@ -1854,63 +1762,98 @@ function setupInputEvents() {
 
 
 /* =========================================================
-   MODAL EVENTS
+   WITHDRAW CAPITAL
 ========================================================= */
 
-function setupModalEvents() {
+async function handleWithdrawCapital(
+  form
+) {
 
-  document.addEventListener(
-    "click",
-    function(event) {
-
-      const closeButton =
-        event.target.closest(
-          "[data-close-modal]"
-        );
+  const button =
+    document.getElementById(
+      "saveWithdrawModalButton"
+    );
 
 
-      if (closeButton) {
-
-        closeAllModals();
-
-      }
-
-    }
-  );
+  const tanggal =
+    getInputValue(
+      "withdrawModalTanggal"
+    );
 
 
-  document.addEventListener(
-    "keydown",
-    function(event) {
-
-      if (
-        event.key === "Escape"
-      ) {
-
-        closeAllModals();
-
-      }
-
-    }
-  );
+  const nominal =
+    getInputNumber(
+      "withdrawModalNominal"
+    );
 
 
-  document.addEventListener(
-    "click",
-    function(event) {
+  const catatan =
+    getInputValue(
+      "withdrawModalCatatan"
+    );
 
-      if (
-        event.target.classList.contains(
-          "modal-overlay"
-        )
-      ) {
 
-        closeAllModals();
+  try {
 
-      }
+    setButtonLoading(
+      button,
+      true,
+      "Memproses..."
+    );
 
-    }
-  );
+
+    await TradingAPI.withdrawCapital(
+      nominal,
+      catatan,
+      tanggal
+    );
+
+
+    closeAllModals();
+
+    form.reset();
+
+
+    setInputValue(
+      "withdrawModalTanggal",
+      getTodayString()
+    );
+
+
+    showToast(
+      "success",
+      "Berhasil",
+      "Modal berhasil ditarik."
+    );
+
+
+    await loadTradingData();
+
+
+  } catch (error) {
+
+    console.error(
+      "[Trading] Withdraw capital error:",
+      error
+    );
+
+
+    showToast(
+      "error",
+      "Gagal",
+      getErrorMessage(error)
+    );
+
+
+  } finally {
+
+    setButtonLoading(
+      button,
+      false,
+      "Tarik Modal"
+    );
+
+  }
 
 }
 
@@ -1920,15 +1863,12 @@ function setupModalEvents() {
 ========================================================= */
 
 function openModal(
-  modalId
+  id
 ) {
-
-  closeAllModals();
-
 
   const modal =
     document.getElementById(
-      modalId
+      id
     );
 
 
@@ -1949,50 +1889,26 @@ function openModal(
   );
 
 
-  /*
-   * Set tanggal terbaru.
-   */
-
-  const today =
-    getTodayString();
-
-
   if (
-    modalId === "addModal"
+    id === "addModal"
   ) {
 
-    const input =
-      document.getElementById(
-        "addModalTanggal"
-      );
-
-
-    if (input) {
-
-      input.value =
-        today;
-
-    }
+    setInputValue(
+      "addModalTanggal",
+      getTodayString()
+    );
 
   }
 
 
   if (
-    modalId === "withdrawModal"
+    id === "withdrawModal"
   ) {
 
-    const input =
-      document.getElementById(
-        "withdrawModalTanggal"
-      );
-
-
-    if (input) {
-
-      input.value =
-        today;
-
-    }
+    setInputValue(
+      "withdrawModalTanggal",
+      getTodayString()
+    );
 
   }
 
@@ -2000,7 +1916,52 @@ function openModal(
 
 
 /* =========================================================
-   CLOSE ALL MODALS
+   CLOSE MODAL
+========================================================= */
+
+function closeModal(
+  id
+) {
+
+  const modal =
+    document.getElementById(
+      id
+    );
+
+
+  if (!modal) {
+
+    return;
+
+  }
+
+
+  modal.classList.add(
+    "hidden"
+  );
+
+
+  const openModals =
+    document.querySelectorAll(
+      ".modal-overlay:not(.hidden)"
+    );
+
+
+  if (
+    openModals.length === 0
+  ) {
+
+    document.body.classList.remove(
+      "modal-open"
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   CLOSE ALL
 ========================================================= */
 
 function closeAllModals() {
@@ -2010,7 +1971,7 @@ function closeAllModals() {
       ".modal-overlay"
     )
     .forEach(
-      function(modal) {
+      function (modal) {
 
         modal.classList.add(
           "hidden"
@@ -2028,817 +1989,110 @@ function closeAllModals() {
 
 
 /* =========================================================
-   ADD CAPITAL SUBMIT
+   CLOSE EVENTS
 ========================================================= */
 
-async function handleAddModalSubmit(
-  event
+function setupCloseModal() {
+
+  document
+    .querySelectorAll(
+      "[data-close-modal]"
+    )
+    .forEach(
+      function (button) {
+
+        button.addEventListener(
+          "click",
+          function () {
+
+            const modal =
+              button.closest(
+                ".modal-overlay"
+              );
+
+
+            if (modal) {
+
+              closeModal(
+                modal.id
+              );
+
+            }
+
+          }
+        );
+
+      }
+    );
+
+
+  document
+    .querySelectorAll(
+      ".modal-overlay"
+    )
+    .forEach(
+      function (overlay) {
+
+        overlay.addEventListener(
+          "click",
+          function (event) {
+
+            if (
+              event.target ===
+              overlay
+            ) {
+
+              closeModal(
+                overlay.id
+              );
+
+            }
+
+          }
+        );
+
+      }
+    );
+
+}
+
+
+/* =========================================================
+   KEYBOARD
+========================================================= */
+
+function setupKeyboardEvents() {
+
+  document.addEventListener(
+    "keydown",
+    function (event) {
+
+      if (
+        event.key === "Escape"
+      ) {
+
+        closeAllModals();
+
+      }
+
+    }
+  );
+
+}
+
+
+/* =========================================================
+   LOADING
+========================================================= */
+
+function setLoading(
+  active,
+  message = "Memuat..."
 ) {
-
-  event.preventDefault();
-
-
-  if (
-    TradingState.loading
-  ) {
-
-    return;
-
-  }
-
-
-  const tanggal =
-    getElementValue(
-      "addModalTanggal"
-    );
-
-
-  const nominal =
-    toNumber(
-      getElementValue(
-        "addModalNominal"
-      )
-    );
-
-
-  const catatan =
-    getElementValue(
-      "addModalCatatan"
-    ).trim();
-
-
-  if (!tanggal) {
-
-    showToast(
-      "error",
-      "Tanggal Belum Diisi",
-      "Tanggal modal wajib diisi."
-    );
-
-    return;
-
-  }
-
-
-  if (
-    nominal <= 0
-  ) {
-
-    showToast(
-      "error",
-      "Nominal Tidak Valid",
-      "Nominal modal harus lebih besar dari 0."
-    );
-
-    return;
-
-  }
-
 
   TradingState.loading =
-    true;
+    active;
 
-
-  setGlobalLoading(
-    true,
-    "Menambahkan modal..."
-  );
-
-
-  try {
-
-    const result =
-      await TradingAPI.post(
-        "add_modal",
-        {
-
-          tanggal:
-            tanggal,
-
-          nominal:
-            nominal,
-
-          catatan:
-            catatan
-
-        }
-      );
-
-
-    if (
-      result &&
-      result.success === false
-    ) {
-
-      throw new Error(
-        result.message ||
-        "Gagal menambahkan modal."
-      );
-
-    }
-
-
-    closeAllModals();
-
-
-    const form =
-      document.getElementById(
-        "addModalForm"
-      );
-
-
-    if (form) {
-
-      form.reset();
-
-    }
-
-
-    await loadTradingData();
-
-
-    showToast(
-      "success",
-      "Modal Berhasil",
-      "Modal berhasil ditambahkan."
-    );
-
-
-  } catch (error) {
-
-    console.error(
-      "[Trading] ADD CAPITAL ERROR:",
-      error
-    );
-
-
-    showToast(
-      "error",
-      "Gagal Menambah Modal",
-      getErrorMessage(error)
-    );
-
-
-  } finally {
-
-    TradingState.loading =
-      false;
-
-
-    setGlobalLoading(
-      false
-    );
-
-  }
-
-}
-
-
-/* =========================================================
-   WITHDRAW CAPITAL SUBMIT
-========================================================= */
-
-async function handleWithdrawModalSubmit(
-  event
-) {
-
-  event.preventDefault();
-
-
-  if (
-    TradingState.loading
-  ) {
-
-    return;
-
-  }
-
-
-  const tanggal =
-    getElementValue(
-      "withdrawModalTanggal"
-    );
-
-
-  const nominal =
-    toNumber(
-      getElementValue(
-        "withdrawModalNominal"
-      )
-    );
-
-
-  const catatan =
-    getElementValue(
-      "withdrawModalCatatan"
-    ).trim();
-
-
-  if (!tanggal) {
-
-    showToast(
-      "error",
-      "Tanggal Belum Diisi",
-      "Tanggal penarikan wajib diisi."
-    );
-
-    return;
-
-  }
-
-
-  if (
-    nominal <= 0
-  ) {
-
-    showToast(
-      "error",
-      "Nominal Tidak Valid",
-      "Nominal penarikan harus lebih besar dari 0."
-    );
-
-    return;
-
-  }
-
-
-  if (
-    nominal >
-    TradingState.summary.modal
-  ) {
-
-    showToast(
-      "error",
-      "Modal Tidak Cukup",
-      "Nominal penarikan lebih besar dari modal tersedia."
-    );
-
-    return;
-
-  }
-
-
-  TradingState.loading =
-    true;
-
-
-  setGlobalLoading(
-    true,
-    "Menarik modal..."
-  );
-
-
-  try {
-
-    const result =
-      await TradingAPI.post(
-        "withdraw_modal",
-        {
-
-          tanggal:
-            tanggal,
-
-          nominal:
-            nominal,
-
-          catatan:
-            catatan
-
-        }
-      );
-
-
-    if (
-      result &&
-      result.success === false
-    ) {
-
-      throw new Error(
-        result.message ||
-        "Gagal menarik modal."
-      );
-
-    }
-
-
-    closeAllModals();
-
-
-    const form =
-      document.getElementById(
-        "withdrawModalForm"
-      );
-
-
-    if (form) {
-
-      form.reset();
-
-    }
-
-
-    await loadTradingData();
-
-
-    showToast(
-      "success",
-      "Penarikan Berhasil",
-      "Modal berhasil ditarik."
-    );
-
-
-  } catch (error) {
-
-    console.error(
-      "[Trading] WITHDRAW ERROR:",
-      error
-    );
-
-
-    showToast(
-      "error",
-      "Gagal Menarik Modal",
-      getErrorMessage(error)
-    );
-
-
-  } finally {
-
-    TradingState.loading =
-      false;
-
-
-    setGlobalLoading(
-      false
-    );
-
-  }
-
-}
-
-
-/* =========================================================
-   TRANSACTION SORT
-========================================================= */
-
-function compareTransactionDate(
-  a,
-  b
-) {
-
-  const dateA =
-    parseSortableDate(
-      a._tanggal
-    );
-
-
-  const dateB =
-    parseSortableDate(
-      b._tanggal
-    );
-
-
-  return dateB - dateA;
-
-}
-
-
-/* =========================================================
-   SORTABLE DATE
-========================================================= */
-
-function parseSortableDate(
-  value
-) {
-
-  if (!value) {
-
-    return 0;
-
-  }
-
-
-  const stringValue =
-    String(value)
-      .trim();
-
-
-  /*
-   * YYYY-MM-DD
-   */
-
-  if (
-    /^\d{4}-\d{2}-\d{2}$/
-      .test(
-        stringValue
-      )
-  ) {
-
-    const parts =
-      stringValue.split("-");
-
-
-    return new Date(
-      Number(parts[0]),
-      Number(parts[1]) - 1,
-      Number(parts[2])
-    ).getTime();
-
-  }
-
-
-  /*
-   * DD/MM/YYYY
-   */
-
-  if (
-    /^\d{2}\/\d{2}\/\d{4}$/
-      .test(
-        stringValue
-      )
-  ) {
-
-    const parts =
-      stringValue.split("/");
-
-
-    return new Date(
-      Number(parts[2]),
-      Number(parts[1]) - 1,
-      Number(parts[0])
-    ).getTime();
-
-  }
-
-
-  const date =
-    new Date(
-      stringValue
-    );
-
-
-  return isNaN(
-    date.getTime()
-  )
-    ? 0
-    : date.getTime();
-
-}
-
-
-/* =========================================================
-   FORMAT DISPLAY DATE
-========================================================= */
-
-function formatDisplayDate(
-  value
-) {
-
-  if (!value) {
-
-    return "-";
-
-  }
-
-
-  const stringValue =
-    String(value)
-      .trim();
-
-
-  /*
-   * YYYY-MM-DD
-   */
-
-  if (
-    /^\d{4}-\d{2}-\d{2}$/
-      .test(
-        stringValue
-      )
-  ) {
-
-    const parts =
-      stringValue.split("-");
-
-
-    return (
-      parts[2] +
-      "/" +
-      parts[1] +
-      "/" +
-      parts[0]
-    );
-
-  }
-
-
-  /*
-   * DD/MM/YYYY
-   */
-
-  if (
-    /^\d{2}\/\d{2}\/\d{4}$/
-      .test(
-        stringValue
-      )
-  ) {
-
-    return stringValue;
-
-  }
-
-
-  return stringValue;
-
-}
-
-
-/* =========================================================
-   FORMAT RUPIAH
-========================================================= */
-
-function formatRupiah(
-  value
-) {
-
-  const number =
-    toNumber(value);
-
-
-  const sign =
-    number < 0
-      ? "-"
-      : "";
-
-
-  const absolute =
-    Math.abs(number);
-
-
-  return (
-    sign +
-    "Rp" +
-    new Intl.NumberFormat(
-      "id-ID"
-    ).format(
-      absolute
-    )
-  );
-
-}
-
-
-/* =========================================================
-   FORMAT NUMBER
-========================================================= */
-
-function formatNumber(
-  value
-) {
-
-  return new Intl.NumberFormat(
-    "id-ID"
-  ).format(
-    toNumber(value)
-  );
-
-}
-
-
-/* =========================================================
-   TO NUMBER
-========================================================= */
-
-function toNumber(
-  value
-) {
-
-  if (
-    value === null ||
-    value === undefined ||
-    value === ""
-  ) {
-
-    return 0;
-
-  }
-
-
-  if (
-    typeof value === "number"
-  ) {
-
-    return Number.isFinite(value)
-      ? value
-      : 0;
-
-  }
-
-
-  let stringValue =
-    String(value)
-      .trim();
-
-
-  /*
-   * Format Indonesia:
-   *
-   * 300.000
-   * 1.500.000
-   *
-   * Hilangkan pemisah ribuan.
-   */
-
-  stringValue =
-    stringValue.replace(
-      /Rp/gi,
-      ""
-    );
-
-
-  stringValue =
-    stringValue.replace(
-      /\s/g,
-      ""
-    );
-
-
-  /*
-   * Jika angka memakai titik
-   * sebagai pemisah ribuan.
-   */
-
-  if (
-    stringValue.includes(".") &&
-    !stringValue.includes(",")
-  ) {
-
-    stringValue =
-      stringValue.replace(
-        /\./g,
-        ""
-      );
-
-  }
-
-
-  /*
-   * Koma dianggap desimal.
-   */
-
-  else if (
-    stringValue.includes(",") &&
-    stringValue.includes(".")
-  ) {
-
-    stringValue =
-      stringValue.replace(
-        /\./g,
-        ""
-      )
-      .replace(
-        ",",
-        "."
-      );
-
-  }
-
-  else {
-
-    stringValue =
-      stringValue.replace(
-        ",",
-        "."
-      );
-
-  }
-
-
-  stringValue =
-    stringValue.replace(
-      /[^\d.-]/g,
-      ""
-    );
-
-
-  const number =
-    Number(
-      stringValue
-    );
-
-
-  return Number.isFinite(
-    number
-  )
-    ? number
-    : 0;
-
-}
-
-
-/* =========================================================
-   GET ELEMENT VALUE
-========================================================= */
-
-function getElementValue(
-  id
-) {
-
-  const element =
-    document.getElementById(
-      id
-    );
-
-
-  if (!element) {
-
-    return "";
-
-  }
-
-
-  return element.value || "";
-
-}
-
-
-/* =========================================================
-   SANITIZE NUMERIC INPUT
-========================================================= */
-
-function sanitizeNumericInput(
-  event
-) {
-
-  let value =
-    event.target.value;
-
-
-  value =
-    value.replace(
-      /[^\d]/g,
-      ""
-    );
-
-
-  event.target.value =
-    value;
-
-}
-
-
-/* =========================================================
-   TODAY STRING
-========================================================= */
-
-function getTodayString() {
-
-  const now =
-    new Date();
-
-
-  const year =
-    now.getFullYear();
-
-
-  const month =
-    String(
-      now.getMonth() + 1
-    )
-    .padStart(
-      2,
-      "0"
-    );
-
-
-  const day =
-    String(
-      now.getDate()
-    )
-    .padStart(
-      2,
-      "0"
-    );
-
-
-  return (
-    year +
-    "-" +
-    month +
-    "-" +
-    day
-  );
-
-}
-
-
-/* =========================================================
-   LOADING TRANSACTION
-========================================================= */
-
-function setTransactionLoading(
-  isLoading
-) {
 
   const loading =
     document.getElementById(
@@ -2846,19 +2100,15 @@ function setTransactionLoading(
     );
 
 
-  const empty =
-    document.getElementById(
-      "transactionEmpty"
-    );
+  const loadingText =
+    loading
+      ? loading.querySelector(
+          "span"
+        )
+      : null;
 
 
-  const wrapper =
-    document.getElementById(
-      "transactionTableWrapper"
-    );
-
-
-  if (isLoading) {
+  if (active) {
 
     if (loading) {
 
@@ -2869,26 +2119,14 @@ function setTransactionLoading(
     }
 
 
-    if (empty) {
+    if (loadingText) {
 
-      empty.classList.add(
-        "hidden"
-      );
-
-    }
-
-
-    if (wrapper) {
-
-      wrapper.classList.add(
-        "hidden"
-      );
+      loadingText.textContent =
+        message;
 
     }
 
-  }
-
-  else {
+  } else {
 
     if (loading) {
 
@@ -2900,58 +2138,95 @@ function setTransactionLoading(
 
   }
 
-}
 
+  /*
+   * Global loading jika tersedia.
+   */
 
-/* =========================================================
-   GLOBAL LOADING
-========================================================= */
-
-function setGlobalLoading(
-  show,
-  message = "Memproses..."
-) {
-
-  const loading =
+  const global =
     document.getElementById(
       "globalLoading"
     );
 
 
-  const text =
+  const globalText =
     document.getElementById(
       "globalLoadingText"
     );
 
 
-  if (!loading) {
+  if (global) {
+
+    if (active) {
+
+      global.classList.remove(
+        "hidden"
+      );
+
+    } else {
+
+      global.classList.add(
+        "hidden"
+      );
+
+    }
+
+  }
+
+
+  if (
+    globalText &&
+    active
+  ) {
+
+    globalText.textContent =
+      message;
+
+  }
+
+}
+
+
+/* =========================================================
+   BUTTON LOADING
+========================================================= */
+
+function setButtonLoading(
+  button,
+  loading,
+  text
+) {
+
+  if (!button) {
 
     return;
 
   }
 
 
-  if (text) {
+  if (loading) {
 
-    text.textContent =
-      message;
-
-  }
+    button.disabled =
+      true;
 
 
-  if (show) {
+    button.dataset.originalText =
+      button.textContent;
 
-    loading.classList.remove(
-      "hidden"
-    );
 
-  }
+    button.textContent =
+      text;
 
-  else {
+  } else {
 
-    loading.classList.add(
-      "hidden"
-    );
+    button.disabled =
+      false;
+
+
+    button.textContent =
+      text ||
+      button.dataset.originalText ||
+      "Simpan";
 
   }
 
@@ -2974,19 +2249,19 @@ function showToast(
     );
 
 
-  const icon =
+  const toastIcon =
     document.getElementById(
       "toastIcon"
     );
 
 
-  const titleElement =
+  const toastTitle =
     document.getElementById(
       "toastTitle"
     );
 
 
-  const messageElement =
+  const toastMessage =
     document.getElementById(
       "toastMessage"
     );
@@ -2995,12 +2270,7 @@ function showToast(
   if (!toast) {
 
     console.log(
-      "[" +
-      type +
-      "] " +
-      title +
-      ": " +
-      message
+      title + ": " + message
     );
 
     return;
@@ -3008,3009 +2278,42 @@ function showToast(
   }
 
 
-  if (titleElement) {
-
-    titleElement.textContent =
-      title;
-
-  }
-
-
-  if (messageElement) {
-
-    messageElement.textContent =
-      message;
-
-  }
-
-
-  if (icon) {
-
-    icon.textContent =
-      type === "success"
-        ? "✓"
-        : "×";
-
-  }
-
-
   toast.classList.remove(
-    "hidden"
-  );
-
-
-  toast.classList.remove(
-    "toast-success"
-  );
-
-
-  toast.classList.remove(
+    "hidden",
+    "toast-success",
     "toast-error"
   );
 
 
-  toast.classList.add(
-    type === "success"
-      ? "toast-success"
-      : "toast-error"
-  );
-
-
-  clearTimeout(
-    window.__tradingToastTimer
-  );
-
-
-  window.__tradingToastTimer =
-    setTimeout(
-      function() {
-
-        toast.classList.add(
-          "hidden"
-        );
-
-      },
-      4000
-    );
-
-}
-
-
-/* =========================================================
-   ERROR MESSAGE
-========================================================= */
-
-function getErrorMessage(
-  error
-) {
-
-  if (!error) {
-
-    return "Terjadi kesalahan.";
-
-  }
-
-
   if (
-    typeof error === "string"
+    type === "error"
   ) {
 
-    return error;
-
-  }
-
-
-  if (
-    error.message
-  ) {
-
-    return error.message;
-
-  }
-
-
-  if (
-    window.TradingAPI &&
-    typeof TradingAPI.errorMessage ===
-      "function"
-  ) {
-
-    return TradingAPI.errorMessage(
-      error
+    toast.classList.add(
+      "toast-error"
     );
 
-  }
+    if (toastIcon) {
 
-
-  return String(
-    error
-  );
-
-}
-
-
-/* =========================================================
-   DEBUG
-========================================================= */
-
-function debugTradingPage() {
-
-  console.log(
-    "========================================"
-  );
-
-  console.log(
-    "TRADING JOURNAL DEBUG"
-  );
-
-  console.log(
-    "Transactions:",
-    TradingState.transactions
-  );
-
-  console.log(
-    "Modal:",
-    TradingState.modal
-  );
-
-  console.log(
-    "Summary:",
-    TradingState.summary
-  );
-
-  console.log(
-    "========================================"
-  );
-
-}
-
-
-/* =========================================================
-   GLOBAL OBJECT
-========================================================= */
-
-window.TradingPage = {
-
-  state:
-    TradingState,
-
-  load:
-    loadTradingData,
-
-  refresh:
-    loadTradingData,
-
-  render:
-    renderRecentTransactions,
-
-  summary:
-    renderSummary,
-
-  debug:
-    debugTradingPage
-
-};
-
-
-/* =========================================================
-   GLOBAL DEBUG SHORTCUT
-========================================================= */
-
-window.debugTradingPage =
-  debugTradingPage;
-
-
-/* =========================================================
-   INITIAL LOG
-========================================================= */
-
-console.log(
-  "[Trading] trading.js STAGE 1 loaded."
-);
-
-console.log(
-  "[Trading] Google Sheets headers:"
-);
-
-console.log(
-  "ID | Tanggal | Saham | Aksi | Harga | Lot | Profit/Rugi | Nominal | Catatan | Timestamp"
-);
-/* =========================================================
-   TRADING JOURNAL
-   TRADING.JS
-   TAHAP 2 / 2
-
-   FUNGSI:
-   - Load transaksi
-   - Render transaksi
-   - Edit transaksi
-   - Hapus transaksi
-   - Tambah modal
-   - Tarik modal
-   - Refresh data
-   - Update summary
-   - Toast
-   - Loading
-   - Modal popup
-   - Sinkronisasi Google Sheets
-
-   CATATAN:
-   Header TRANSAKSI Google Sheets:
-
-   ID
-   Tanggal
-   Saham
-   Aksi
-   Harga
-   Lot
-   Profit/Rugi
-   Nominal
-   Catatan
-   Timestamp
-========================================================= */
-
-"use strict";
-
-
-/* =========================================================
-   STATE
-========================================================= */
-
-const TradingState = {
-
-  transactions: [],
-
-  modal: [],
-
-  summary: {},
-
-  editingId: null,
-
-  isLoading: false,
-
-  isSaving: false
-
-};
-
-
-/* =========================================================
-   DOM HELPER
-========================================================= */
-
-function $(id) {
-
-  return document.getElementById(id);
-
-}
-
-
-/* =========================================================
-   ELEMENTS
-========================================================= */
-
-const transactionForm =
-  $("transactionForm");
-
-const transactionTableBody =
-  $("transactionTableBody");
-
-const transactionTableWrapper =
-  $("transactionTableWrapper");
-
-const transactionLoading =
-  $("transactionLoading");
-
-const transactionEmpty =
-  $("transactionEmpty");
-
-const saveTransactionButton =
-  $("saveTransactionButton");
-
-const addModal =
-  $("addModal");
-
-const withdrawModal =
-  $("withdrawModal");
-
-const addModalButton =
-  $("addModalButton");
-
-const withdrawModalButton =
-  $("withdrawModalButton");
-
-const addModalForm =
-  $("addModalForm");
-
-const withdrawModalForm =
-  $("withdrawModalForm");
-
-const globalLoading =
-  $("globalLoading");
-
-const globalLoadingText =
-  $("globalLoadingText");
-
-const toast =
-  $("toast");
-
-
-/* =========================================================
-   FORMAT RUPIAH
-========================================================= */
-
-function formatRupiah(value) {
-
-  const number =
-    Number(value) || 0;
-
-  return new Intl.NumberFormat(
-    "id-ID",
-    {
-      style: "currency",
-      currency: "IDR",
-      maximumFractionDigits: 0
-    }
-  ).format(number);
-
-}
-
-
-/* =========================================================
-   FORMAT NUMBER
-========================================================= */
-
-function formatNumber(value) {
-
-  const number =
-    Number(value) || 0;
-
-  return new Intl.NumberFormat(
-    "id-ID",
-    {
-      maximumFractionDigits: 0
-    }
-  ).format(number);
-
-}
-
-
-/* =========================================================
-   NORMALIZE TRANSACTION
-========================================================= */
-
-function normalizeTransaction(row) {
-
-  if (!row || typeof row !== "object") {
-
-    return null;
-
-  }
-
-
-  /*
-   * Backend menggunakan:
-   *
-   * ID
-   * Tanggal
-   * Saham
-   * Aksi
-   * Harga
-   * Lot
-   * Profit/Rugi
-   * Nominal
-   * Catatan
-   * Timestamp
-   */
-
-  return {
-
-    ID:
-      row.ID ??
-      row.id ??
-      "",
-
-    Tanggal:
-      row.Tanggal ??
-      row.tanggal ??
-      "",
-
-    Saham:
-      String(
-        row.Saham ??
-        row.saham ??
-        ""
-      )
-      .trim()
-      .toUpperCase(),
-
-    Aksi:
-      String(
-        row.Aksi ??
-        row.aksi ??
-        ""
-      )
-      .trim()
-      .toUpperCase(),
-
-    Harga:
-      Number(
-        row.Harga ??
-        row.harga ??
-        0
-      ) || 0,
-
-    Lot:
-      Number(
-        row.Lot ??
-        row.lot ??
-        0
-      ) || 0,
-
-    "Profit/Rugi":
-      String(
-        row["Profit/Rugi"] ??
-        row.profitRugi ??
-        row.hasil ??
-        ""
-      )
-      .trim()
-      .toUpperCase(),
-
-    Nominal:
-      Number(
-        row.Nominal ??
-        row.nominal ??
-        0
-      ) || 0,
-
-    Catatan:
-      String(
-        row.Catatan ??
-        row.catatan ??
-        ""
-      ),
-
-    Timestamp:
-      row.Timestamp ??
-      row.timestamp ??
-      ""
-
-  };
-
-}
-
-
-/* =========================================================
-   NORMALIZE SUMMARY
-========================================================= */
-
-function normalizeSummary(summary) {
-
-  summary =
-    summary || {};
-
-  return {
-
-    modalAwal:
-      Number(
-        summary.modalAwal
-      ) || 0,
-
-    totalTambah:
-      Number(
-        summary.totalTambah
-      ) || 0,
-
-    totalTarik:
-      Number(
-        summary.totalTarik
-      ) || 0,
-
-    modal:
-      Number(
-        summary.modal
-      ) || 0,
-
-    totalProfit:
-      Number(
-        summary.totalProfit
-      ) || 0,
-
-    totalRugi:
-      Number(
-        summary.totalRugi
-      ) || 0,
-
-    netProfit:
-      Number(
-        summary.netProfit
-      ) || 0,
-
-    total:
-      Number(
-        summary.total
-      ) || 0,
-
-    jumlahTransaksi:
-      Number(
-        summary.jumlahTransaksi
-      ) || 0,
-
-    jumlahProfit:
-      Number(
-        summary.jumlahProfit
-      ) || 0,
-
-    jumlahRugi:
-      Number(
-        summary.jumlahRugi
-      ) || 0,
-
-    winRate:
-      Number(
-        summary.winRate
-      ) || 0
-
-  };
-
-}
-
-
-/* =========================================================
-   EXTRACT API DATA
-========================================================= */
-
-function extractApiData(result) {
-
-  if (!result) {
-
-    return {
-
-      transaksi: [],
-
-      modal: [],
-
-      summary: {}
-
-    };
-
-  }
-
-
-  /*
-   * Backend utama:
-   *
-   * {
-   *   success: true,
-   *   data: {
-   *      transaksi: [],
-   *      modal: [],
-   *      summary: {}
-   *   }
-   * }
-   */
-
-  if (
-    result.data &&
-    typeof result.data === "object" &&
-    !Array.isArray(result.data)
-  ) {
-
-    return {
-
-      transaksi:
-        Array.isArray(
-          result.data.transaksi
-        )
-          ? result.data.transaksi
-          : [],
-
-      modal:
-        Array.isArray(
-          result.data.modal
-        )
-          ? result.data.modal
-          : [],
-
-      summary:
-        result.data.summary || {}
-
-    };
-
-  }
-
-
-  /*
-   * Fallback response lama.
-   */
-
-  return {
-
-    transaksi:
-      Array.isArray(result.transaksi)
-        ? result.transaksi
-        : Array.isArray(result.transactions)
-          ? result.transactions
-          : [],
-
-    modal:
-      Array.isArray(result.modal)
-        ? result.modal
-        : [],
-
-    summary:
-      result.summary ||
-      result.report ||
-      {}
-
-  };
-
-}
-
-
-/* =========================================================
-   LOAD ALL DATA
-========================================================= */
-
-async function loadTradingData(
-  showLoading = true
-) {
-
-  if (TradingState.isLoading) {
-
-    return;
-
-  }
-
-
-  TradingState.isLoading = true;
-
-
-  if (showLoading) {
-
-    setTransactionLoading(true);
-
-  }
-
-
-  try {
-
-    /*
-     * API JS sudah menyediakan:
-     *
-     * TradingAPI.getAllData()
-     */
-
-    const result =
-      await TradingAPI.getAllData();
-
-
-    if (
-      result &&
-      result.success === false
-    ) {
-
-      throw new Error(
-        result.message ||
-        "Gagal mengambil data."
-      );
+      toastIcon.textContent =
+        "×";
 
     }
 
+  } else {
 
-    const data =
-      extractApiData(result);
-
-
-    /*
-     * NORMALIZE TRANSACTIONS
-     */
-
-    TradingState.transactions =
-      data.transaksi
-        .map(
-          normalizeTransaction
-        )
-        .filter(Boolean);
-
-
-    /*
-     * NORMALIZE MODAL
-     */
-
-    TradingState.modal =
-      Array.isArray(data.modal)
-        ? data.modal
-        : [];
-
-
-    /*
-     * SUMMARY
-     */
-
-    TradingState.summary =
-      normalizeSummary(
-        data.summary
-      );
-
-
-    /*
-     * UPDATE UI
-     */
-
-    renderSummary();
-
-    renderTransactions();
-
-    updateFormState();
-
-
-    console.log(
-      "[Trading] Data berhasil dimuat:",
-      {
-        transaksi:
-          TradingState.transactions.length,
-
-        modal:
-          TradingState.modal.length,
-
-        summary:
-          TradingState.summary
-      }
+    toast.classList.add(
+      "toast-success"
     );
 
+    if (toastIcon) {
 
-  } catch (error) {
-
-    console.error(
-      "[Trading] Load error:",
-      error
-    );
-
-
-    showToast(
-      "error",
-      "Gagal Memuat Data",
-      getTradingErrorMessage(
-        error
-      )
-    );
-
-
-    renderTransactionsError();
-
-
-  } finally {
-
-    TradingState.isLoading = false;
-
-    if (showLoading) {
-
-      setTransactionLoading(false);
+      toastIcon.textContent =
+        "✓";
 
     }
 
   }
-
-}
-
-
-/* =========================================================
-   REFRESH DATA
-========================================================= */
-
-async function refreshTradingData() {
-
-  await loadTradingData(true);
-
-}
-
-
-/* =========================================================
-   RENDER SUMMARY
-========================================================= */
-
-function renderSummary() {
-
-  const summary =
-    TradingState.summary ||
-    {};
-
-
-  const modalValue =
-    $("modalValue");
-
-  const profitLossValue =
-    $("profitLossValue");
-
-  const totalValue =
-    $("totalValue");
-
-  const profitIcon =
-    $("profitIcon");
-
-  const profitDescription =
-    $("profitLossDescription");
-
-
-  if (modalValue) {
-
-    modalValue.textContent =
-      formatRupiah(
-        summary.modal
-      );
-
-  }
-
-
-  if (profitLossValue) {
-
-    profitLossValue.textContent =
-      formatRupiah(
-        summary.netProfit
-      );
-
-
-    profitLossValue.classList.remove(
-      "positive",
-      "negative",
-      "profit",
-      "loss"
-    );
-
-
-    if (
-      summary.netProfit > 0
-    ) {
-
-      profitLossValue.classList.add(
-        "positive"
-      );
-
-    }
-
-    else if (
-      summary.netProfit < 0
-    ) {
-
-      profitLossValue.classList.add(
-        "negative"
-      );
-
-    }
-
-  }
-
-
-  if (profitIcon) {
-
-    if (
-      summary.netProfit > 0
-    ) {
-
-      profitIcon.textContent =
-        "↗";
-
-    }
-
-    else if (
-      summary.netProfit < 0
-    ) {
-
-      profitIcon.textContent =
-        "↘";
-
-    }
-
-    else {
-
-      profitIcon.textContent =
-        "→";
-
-    }
-
-  }
-
-
-  if (profitDescription) {
-
-    if (
-      summary.netProfit > 0
-    ) {
-
-      profitDescription.textContent =
-        "Net profit trading";
-
-    }
-
-    else if (
-      summary.netProfit < 0
-    ) {
-
-      profitDescription.textContent =
-        "Net rugi trading";
-
-    }
-
-    else {
-
-      profitDescription.textContent =
-        "Net hasil trading";
-
-    }
-
-  }
-
-
-  if (totalValue) {
-
-    totalValue.textContent =
-      formatRupiah(
-        summary.total
-      );
-
-  }
-
-}
-
-
-/* =========================================================
-   RENDER TRANSACTIONS
-========================================================= */
-
-function renderTransactions() {
-
-  if (!transactionTableBody) {
-
-    return;
-
-  }
-
-
-  transactionTableBody.innerHTML =
-    "";
-
-
-  const transactions =
-    TradingState.transactions || [];
-
-
-  /*
-   * Urutkan transaksi terbaru
-   * berdasarkan tanggal.
-   */
-
-  const sorted =
-    [...transactions]
-      .sort(
-        function(a, b) {
-
-          const dateA =
-            parseTradingDate(
-              a.Tanggal
-            );
-
-          const dateB =
-            parseTradingDate(
-              b.Tanggal
-            );
-
-          return (
-            dateB.getTime() -
-            dateA.getTime()
-          );
-
-        }
-      );
-
-
-  /*
-   * Hanya tampilkan transaksi terbaru.
-   */
-
-  const recent =
-    sorted.slice(
-      0,
-      10
-    );
-
-
-  if (
-    recent.length === 0
-  ) {
-
-    showTransactionEmpty();
-
-    return;
-
-  }
-
-
-  hideElement(
-    transactionLoading
-  );
-
-  hideElement(
-    transactionEmpty
-  );
-
-  showElement(
-    transactionTableWrapper
-  );
-
-
-  recent.forEach(
-    function(transaction) {
-
-      const row =
-        createTransactionRow(
-          transaction
-        );
-
-      transactionTableBody.appendChild(
-        row
-      );
-
-    }
-  );
-
-}
-
-
-/* =========================================================
-   CREATE TRANSACTION ROW
-========================================================= */
-
-function createTransactionRow(
-  transaction
-) {
-
-  const tr =
-    document.createElement(
-      "tr"
-    );
-
-
-  tr.dataset.id =
-    transaction.ID;
-
-
-  /*
-   * Tanggal
-   */
-
-  const tdTanggal =
-    document.createElement(
-      "td"
-    );
-
-  tdTanggal.textContent =
-    formatDisplayDate(
-      transaction.Tanggal
-    );
-
-
-  /*
-   * Saham
-   */
-
-  const tdSaham =
-    document.createElement(
-      "td"
-    );
-
-  const saham =
-    document.createElement(
-      "strong"
-    );
-
-  saham.textContent =
-    transaction.Saham || "-";
-
-  tdSaham.appendChild(
-    saham
-  );
-
-
-  /*
-   * Aksi
-   */
-
-  const tdAksi =
-    document.createElement(
-      "td"
-    );
-
-  const aksiBadge =
-    document.createElement(
-      "span"
-    );
-
-  aksiBadge.className =
-    "transaction-badge " +
-    (
-      transaction.Aksi === "BUY"
-        ? "badge-buy"
-        : "badge-sell"
-    );
-
-  aksiBadge.textContent =
-    transaction.Aksi || "-";
-
-  tdAksi.appendChild(
-    aksiBadge
-  );
-
-
-  /*
-   * Harga
-   */
-
-  const tdHarga =
-    document.createElement(
-      "td"
-    );
-
-  tdHarga.textContent =
-    formatNumber(
-      transaction.Harga
-    );
-
-
-  /*
-   * Lot
-   */
-
-  const tdLot =
-    document.createElement(
-      "td"
-    );
-
-  tdLot.textContent =
-    formatNumber(
-      transaction.Lot
-    );
-
-
-  /*
-   * Hasil
-   */
-
-  const tdHasil =
-    document.createElement(
-      "td"
-    );
-
-
-  const hasil =
-    transaction["Profit/Rugi"];
-
-
-  if (hasil) {
-
-    const hasilBadge =
-      document.createElement(
-        "span"
-      );
-
-    hasilBadge.className =
-      "result-badge " +
-      (
-        hasil === "PROFIT"
-          ? "result-profit"
-          : "result-loss"
-      );
-
-    hasilBadge.textContent =
-      hasil;
-
-    tdHasil.appendChild(
-      hasilBadge
-    );
-
-  }
-
-  else {
-
-    tdHasil.textContent =
-      "-";
-
-  }
-
-
-  /*
-   * Nominal
-   */
-
-  const tdNominal =
-    document.createElement(
-      "td"
-    );
-
-  tdNominal.textContent =
-    transaction.Nominal
-      ? formatRupiah(
-          transaction.Nominal
-        )
-      : "-";
-
-
-  /*
-   * Actions
-   */
-
-  const tdActions =
-    document.createElement(
-      "td"
-    );
-
-  tdActions.className =
-    "transaction-actions";
-
-
-  const editButton =
-    document.createElement(
-      "button"
-    );
-
-  editButton.type =
-    "button";
-
-  editButton.className =
-    "table-action-button edit-button";
-
-  editButton.textContent =
-    "Edit";
-
-  editButton.title =
-    "Edit transaksi";
-
-
-  editButton.addEventListener(
-    "click",
-    function() {
-
-      editTransaction(
-        transaction.ID
-      );
-
-    }
-  );
-
-
-  const deleteButton =
-    document.createElement(
-      "button"
-    );
-
-  deleteButton.type =
-    "button";
-
-  deleteButton.className =
-    "table-action-button delete-button";
-
-  deleteButton.textContent =
-    "Hapus";
-
-  deleteButton.title =
-    "Hapus transaksi";
-
-
-  deleteButton.addEventListener(
-    "click",
-    function() {
-
-      deleteTransaction(
-        transaction.ID
-      );
-
-    }
-  );
-
-
-  tdActions.appendChild(
-    editButton
-  );
-
-  tdActions.appendChild(
-    deleteButton
-  );
-
-
-  /*
-   * Append
-   */
-
-  tr.appendChild(
-    tdTanggal
-  );
-
-  tr.appendChild(
-    tdSaham
-  );
-
-  tr.appendChild(
-    tdAksi
-  );
-
-  tr.appendChild(
-    tdHarga
-  );
-
-  tr.appendChild(
-    tdLot
-  );
-
-  tr.appendChild(
-    tdHasil
-  );
-
-  tr.appendChild(
-    tdNominal
-  );
-
-  /*
-   * Kolom action ditambahkan
-   * walaupun header lama belum ada.
-   */
-
-  tr.appendChild(
-    tdActions
-  );
-
-
-  return tr;
-
-}
-
-
-/* =========================================================
-   EDIT TRANSACTION
-========================================================= */
-
-function editTransaction(
-  id
-) {
-
-  if (!id) {
-
-    showToast(
-      "error",
-      "Edit Gagal",
-      "ID transaksi tidak ditemukan."
-    );
-
-    return;
-
-  }
-
-
-  const transaction =
-    TradingState.transactions.find(
-      function(item) {
-
-        return String(
-          item.ID
-        ) === String(id);
-
-      }
-    );
-
-
-  if (!transaction) {
-
-    showToast(
-      "error",
-      "Edit Gagal",
-      "Data transaksi tidak ditemukan."
-    );
-
-    return;
-
-  }
-
-
-  TradingState.editingId =
-    String(id);
-
-
-  /*
-   * Isi form.
-   */
-
-  setInputValue(
-    "tanggal",
-    toInputDate(
-      transaction.Tanggal
-    )
-  );
-
-
-  setInputValue(
-    "saham",
-    transaction.Saham
-  );
-
-
-  setInputValue(
-    "aksi",
-    transaction.Aksi
-  );
-
-
-  setInputValue(
-    "harga",
-    transaction.Harga
-  );
-
-
-  setInputValue(
-    "lot",
-    transaction.Lot
-  );
-
-
-  setInputValue(
-    "profitRugi",
-    transaction["Profit/Rugi"]
-  );
-
-
-  setInputValue(
-    "nominal",
-    transaction.Nominal
-  );
-
-
-  setInputValue(
-    "catatan",
-    transaction.Catatan
-  );
-
-
-  updateNominalVisibility();
-
-
-  /*
-   * Ubah tombol menjadi mode edit.
-   */
-
-  if (saveTransactionButton) {
-
-    saveTransactionButton.innerHTML =
-      `
-        <span>Update Transaksi</span>
-        <span class="button-arrow">→</span>
-      `;
-
-  }
-
-
-  /*
-   * Scroll ke form.
-   */
-
-  if (transactionForm) {
-
-    transactionForm.scrollIntoView({
-      behavior: "smooth",
-      block: "start"
-    });
-
-  }
-
-
-  showToast(
-    "info",
-    "Mode Edit",
-    "Silakan ubah data lalu tekan Update Transaksi."
-  );
-
-}
-
-
-/* =========================================================
-   SAVE EDIT TRANSACTION
-========================================================= */
-
-async function updateTransaction() {
-
-  const id =
-    TradingState.editingId;
-
-
-  if (!id) {
-
-    return false;
-
-  }
-
-
-  const formData =
-    collectTransactionForm();
-
-
-  /*
-   * Kirim action editTransaction.
-   */
-
-  const payload = {
-
-    id:
-      id,
-
-    tanggal:
-      formData.tanggal,
-
-    saham:
-      formData.saham,
-
-    aksi:
-      formData.aksi,
-
-    harga:
-      formData.harga,
-
-    lot:
-      formData.lot,
-
-    profitRugi:
-      formData.profitRugi,
-
-    nominal:
-      formData.nominal,
-
-    catatan:
-      formData.catatan
-
-  };
-
-
-  setGlobalLoading(
-    true,
-    "Mengupdate transaksi..."
-  );
-
-
-  try {
-
-    const result =
-      await TradingAPI.post(
-        "editTransaction",
-        payload
-      );
-
-
-    if (
-      result &&
-      result.success === false
-    ) {
-
-      throw new Error(
-        result.message ||
-        "Gagal mengupdate transaksi."
-      );
-
-    }
-
-
-    /*
-     * Reset mode edit.
-     */
-
-    TradingState.editingId =
-      null;
-
-
-    resetTransactionForm();
-
-
-    /*
-     * Gunakan response API
-     * agar langsung update.
-     */
-
-    if (
-      result &&
-      result.data
-    ) {
-
-      applyApiData(
-        result
-      );
-
-    }
-
-    else {
-
-      await loadTradingData(
-        false
-      );
-
-    }
-
-
-    showToast(
-      "success",
-      "Berhasil",
-      "Transaksi berhasil diupdate."
-    );
-
-
-    return true;
-
-
-  } catch (error) {
-
-    console.error(
-      "[Trading] Update error:",
-      error
-    );
-
-
-    showToast(
-      "error",
-      "Update Gagal",
-      getTradingErrorMessage(
-        error
-      )
-    );
-
-
-    return false;
-
-
-  } finally {
-
-    setGlobalLoading(
-      false
-    );
-
-  }
-
-}
-
-
-/* =========================================================
-   DELETE TRANSACTION
-========================================================= */
-
-async function deleteTransaction(
-  id
-) {
-
-  if (!id) {
-
-    showToast(
-      "error",
-      "Hapus Gagal",
-      "ID transaksi tidak ditemukan."
-    );
-
-    return;
-
-  }
-
-
-  const transaction =
-    TradingState.transactions.find(
-      function(item) {
-
-        return String(
-          item.ID
-        ) === String(id);
-
-      }
-    );
-
-
-  const saham =
-    transaction
-      ? transaction.Saham
-      : "transaksi ini";
-
-
-  const confirmed =
-    window.confirm(
-      "Hapus transaksi " +
-      saham +
-      "?\n\nData yang dihapus tidak dapat dikembalikan."
-    );
-
-
-  if (!confirmed) {
-
-    return;
-
-  }
-
-
-  setGlobalLoading(
-    true,
-    "Menghapus transaksi..."
-  );
-
-
-  try {
-
-    const result =
-      await TradingAPI.post(
-        "deleteTransaction",
-        {
-          id: id
-        }
-      );
-
-
-    if (
-      result &&
-      result.success === false
-    ) {
-
-      throw new Error(
-        result.message ||
-        "Gagal menghapus transaksi."
-      );
-
-    }
-
-
-    /*
-     * Jika response sudah membawa
-     * seluruh data, gunakan langsung.
-     */
-
-    if (
-      result &&
-      result.data
-    ) {
-
-      applyApiData(
-        result
-      );
-
-    }
-
-    else {
-
-      await loadTradingData(
-        false
-      );
-
-    }
-
-
-    showToast(
-      "success",
-      "Berhasil",
-      "Transaksi berhasil dihapus."
-    );
-
-
-  } catch (error) {
-
-    console.error(
-      "[Trading] Delete error:",
-      error
-    );
-
-
-    showToast(
-      "error",
-      "Hapus Gagal",
-      getTradingErrorMessage(
-        error
-      )
-    );
-
-
-  } finally {
-
-    setGlobalLoading(
-      false
-    );
-
-  }
-
-}
-
-
-/* =========================================================
-   APPLY API DATA
-========================================================= */
-
-function applyApiData(
-  result
-) {
-
-  const data =
-    extractApiData(
-      result
-    );
-
-
-  TradingState.transactions =
-    data.transaksi
-      .map(
-        normalizeTransaction
-      )
-      .filter(Boolean);
-
-
-  TradingState.modal =
-    Array.isArray(
-      data.modal
-    )
-      ? data.modal
-      : [];
-
-
-  TradingState.summary =
-    normalizeSummary(
-      data.summary
-    );
-
-
-  renderSummary();
-
-  renderTransactions();
-
-  updateFormState();
-
-}
-
-
-/* =========================================================
-   COLLECT TRANSACTION FORM
-========================================================= */
-
-function collectTransactionForm() {
-
-  const tanggal =
-    $("tanggal")?.value || "";
-
-
-  const saham =
-    String(
-      $("saham")?.value || ""
-    )
-    .trim()
-    .toUpperCase();
-
-
-  const aksi =
-    String(
-      $("aksi")?.value || ""
-    )
-    .trim()
-    .toUpperCase();
-
-
-  const harga =
-    Number(
-      $("harga")?.value
-    ) || 0;
-
-
-  const lot =
-    Number(
-      $("lot")?.value
-    ) || 0;
-
-
-  const profitRugi =
-    String(
-      $("profitRugi")?.value || ""
-    )
-    .trim()
-    .toUpperCase();
-
-
-  const nominal =
-    profitRugi
-      ? Number(
-          $("nominal")?.value
-        ) || 0
-      : 0;
-
-
-  const catatan =
-    String(
-      $("catatan")?.value || ""
-    )
-    .trim();
-
-
-  return {
-
-    tanggal:
-      tanggal,
-
-    saham:
-      saham,
-
-    aksi:
-      aksi,
-
-    harga:
-      harga,
-
-    lot:
-      lot,
-
-    profitRugi:
-      profitRugi,
-
-    nominal:
-      nominal,
-
-    catatan:
-      catatan
-
-  };
-
-}
-
-
-/* =========================================================
-   SUBMIT TRANSACTION
-========================================================= */
-
-async function handleTransactionSubmit(
-  event
-) {
-
-  event.preventDefault();
-
-
-  if (TradingState.isSaving) {
-
-    return;
-
-  }
-
-
-  const formData =
-    collectTransactionForm();
-
-
-  /*
-   * VALIDASI
-   */
-
-  if (!formData.tanggal) {
-
-    showToast(
-      "error",
-      "Data Belum Lengkap",
-      "Tanggal wajib diisi."
-    );
-
-    return;
-
-  }
-
-
-  if (!formData.saham) {
-
-    showToast(
-      "error",
-      "Data Belum Lengkap",
-      "Kode saham wajib diisi."
-    );
-
-    return;
-
-  }
-
-
-  if (
-    !["BUY", "SELL"]
-      .includes(
-        formData.aksi
-      )
-  ) {
-
-    showToast(
-      "error",
-      "Data Tidak Valid",
-      "Aksi harus BUY atau SELL."
-    );
-
-    return;
-
-  }
-
-
-  if (
-    formData.harga <= 0
-  ) {
-
-    showToast(
-      "error",
-      "Data Tidak Valid",
-      "Harga harus lebih besar dari 0."
-    );
-
-    return;
-
-  }
-
-
-  if (
-    formData.lot <= 0
-  ) {
-
-    showToast(
-      "error",
-      "Data Tidak Valid",
-      "Lot harus lebih besar dari 0."
-    );
-
-    return;
-
-  }
-
-
-  if (
-    formData.profitRugi &&
-    formData.nominal <= 0
-  ) {
-
-    showToast(
-      "error",
-      "Data Tidak Valid",
-      "Nominal profit/rugi harus lebih besar dari 0."
-    );
-
-    return;
-
-  }
-
-
-  TradingState.isSaving =
-    true;
-
-
-  setGlobalLoading(
-    true,
-    TradingState.editingId
-      ? "Mengupdate transaksi..."
-      : "Menyimpan transaksi..."
-  );
-
-
-  try {
-
-    /*
-     * EDIT
-     */
-
-    if (
-      TradingState.editingId
-    ) {
-
-      await updateTransaction();
-
-      return;
-
-    }
-
-
-    /*
-     * TAMBAH
-     */
-
-    const result =
-      await TradingAPI.addTransaction(
-        formData
-      );
-
-
-    if (
-      result &&
-      result.success === false
-    ) {
-
-      throw new Error(
-        result.message ||
-        "Gagal menyimpan transaksi."
-      );
-
-    }
-
-
-    /*
-     * Gunakan response langsung
-     * jika tersedia.
-     */
-
-    if (
-      result &&
-      result.data
-    ) {
-
-      applyApiData(
-        result
-      );
-
-    }
-
-    else {
-
-      await loadTradingData(
-        false
-      );
-
-    }
-
-
-    resetTransactionForm();
-
-
-    showToast(
-      "success",
-      "Berhasil",
-      "Transaksi berhasil disimpan."
-    );
-
-
-  } catch (error) {
-
-    console.error(
-      "[Trading] Save error:",
-      error
-    );
-
-
-    showToast(
-      "error",
-      "Gagal Menyimpan",
-      getTradingErrorMessage(
-        error
-      )
-    );
-
-
-  } finally {
-
-    TradingState.isSaving =
-      false;
-
-    setGlobalLoading(
-      false
-    );
-
-  }
-
-}
-
-
-/* =========================================================
-   RESET TRANSACTION FORM
-========================================================= */
-
-function resetTransactionForm() {
-
-  if (transactionForm) {
-
-    transactionForm.reset();
-
-  }
-
-
-  TradingState.editingId =
-    null;
-
-
-  setToday(
-    "tanggal"
-  );
-
-
-  if (saveTransactionButton) {
-
-    saveTransactionButton.innerHTML =
-      `
-        <span>Simpan Transaksi</span>
-        <span class="button-arrow">→</span>
-      `;
-
-  }
-
-
-  updateNominalVisibility();
-
-}
-
-
-/* =========================================================
-   UPDATE FORM STATE
-========================================================= */
-
-function updateFormState() {
-
-  if (
-    TradingState.editingId &&
-    saveTransactionButton
-  ) {
-
-    saveTransactionButton.innerHTML =
-      `
-        <span>Update Transaksi</span>
-        <span class="button-arrow">→</span>
-      `;
-
-  }
-
-}
-
-
-/* =========================================================
-   NOMINAL VISIBILITY
-========================================================= */
-
-function updateNominalVisibility() {
-
-  const group =
-    $("nominalGroup");
-
-  const select =
-    $("profitRugi");
-
-
-  if (!group || !select) {
-
-    return;
-
-  }
-
-
-  const value =
-    select.value;
-
-
-  if (value === "") {
-
-    group.classList.add(
-      "hidden"
-    );
-
-
-    const nominal =
-      $("nominal");
-
-    if (nominal) {
-
-      nominal.value =
-        "";
-
-    }
-
-  }
-
-  else {
-
-    group.classList.remove(
-      "hidden"
-    );
-
-  }
-
-}
-
-
-/* =========================================================
-   LOAD TODAY
-========================================================= */
-
-function setToday(
-  inputId
-) {
-
-  const input =
-    $(inputId);
-
-
-  if (!input) {
-
-    return;
-
-  }
-
-
-  if (input.value) {
-
-    return;
-
-  }
-
-
-  const now =
-    new Date();
-
-
-  const year =
-    now.getFullYear();
-
-
-  const month =
-    String(
-      now.getMonth() + 1
-    )
-    .padStart(
-      2,
-      "0"
-    );
-
-
-  const day =
-    String(
-      now.getDate()
-    )
-    .padStart(
-      2,
-      "0"
-    );
-
-
-  input.value =
-    year +
-    "-" +
-    month +
-    "-" +
-    day;
-
-}
-
-
-/* =========================================================
-   ADD CAPITAL FORM
-========================================================= */
-
-async function handleAddCapital(
-  event
-) {
-
-  event.preventDefault();
-
-
-  const tanggal =
-    $("addModalTanggal")?.value ||
-    getTodayStringTrading();
-
-
-  const nominal =
-    Number(
-      $("addModalNominal")?.value
-    ) || 0;
-
-
-  const catatan =
-    String(
-      $("addModalCatatan")?.value ||
-      ""
-    )
-    .trim();
-
-
-  if (
-    !tanggal
-  ) {
-
-    showToast(
-      "error",
-      "Data Tidak Valid",
-      "Tanggal wajib diisi."
-    );
-
-    return;
-
-  }
-
-
-  if (
-    nominal <= 0
-  ) {
-
-    showToast(
-      "error",
-      "Data Tidak Valid",
-      "Nominal modal harus lebih besar dari 0."
-    );
-
-    return;
-
-  }
-
-
-  setGlobalLoading(
-    true,
-    "Menambahkan modal..."
-  );
-
-
-  try {
-
-    /*
-     * API JS menggunakan addCapital.
-     *
-     * API JS saat ini membuat tanggal sendiri.
-     * Karena form HTML memiliki tanggal,
-     * kita kirim action langsung agar tanggal
-     * form tetap dipakai oleh backend.
-     */
-
-    const result =
-      await TradingAPI.post(
-        "add_modal",
-        {
-
-          tanggal:
-            tanggal,
-
-          nominal:
-            nominal,
-
-          catatan:
-            catatan
-
-        }
-      );
-
-
-    if (
-      result &&
-      result.success === false
-    ) {
-
-      throw new Error(
-        result.message ||
-        "Gagal menambah modal."
-      );
-
-    }
-
-
-    if (
-      result &&
-      result.data
-    ) {
-
-      applyApiData(
-        result
-      );
-
-    }
-
-    else {
-
-      await loadTradingData(
-        false
-      );
-
-    }
-
-
-    closeModal(
-      addModal
-    );
-
-
-    if (addModalForm) {
-
-      addModalForm.reset();
-
-    }
-
-
-    setToday(
-      "addModalTanggal"
-    );
-
-
-    showToast(
-      "success",
-      "Berhasil",
-      "Modal berhasil ditambahkan."
-    );
-
-
-  } catch (error) {
-
-    console.error(
-      "[Trading] Add capital error:",
-      error
-    );
-
-
-    showToast(
-      "error",
-      "Gagal",
-      getTradingErrorMessage(
-        error
-      )
-    );
-
-
-  } finally {
-
-    setGlobalLoading(
-      false
-    );
-
-  }
-
-}
-
-
-/* =========================================================
-   WITHDRAW CAPITAL FORM
-========================================================= */
-
-async function handleWithdrawCapital(
-  event
-) {
-
-  event.preventDefault();
-
-
-  const tanggal =
-    $("withdrawModalTanggal")?.value ||
-    getTodayStringTrading();
-
-
-  const nominal =
-    Number(
-      $("withdrawModalNominal")?.value
-    ) || 0;
-
-
-  const catatan =
-    String(
-      $("withdrawModalCatatan")?.value ||
-      ""
-    )
-    .trim();
-
-
-  if (
-    nominal <= 0
-  ) {
-
-    showToast(
-      "error",
-      "Data Tidak Valid",
-      "Nominal penarikan harus lebih besar dari 0."
-    );
-
-    return;
-
-  }
-
-
-  if (
-    TradingState.summary &&
-    nominal >
-      Number(
-        TradingState.summary.modal
-      )
-  ) {
-
-    showToast(
-      "error",
-      "Penarikan Ditolak",
-      "Nominal penarikan lebih besar dari modal tersedia."
-    );
-
-    return;
-
-  }
-
-
-  setGlobalLoading(
-    true,
-    "Menarik modal..."
-  );
-
-
-  try {
-
-    const result =
-      await TradingAPI.post(
-        "withdraw_modal",
-        {
-
-          tanggal:
-            tanggal,
-
-          nominal:
-            nominal,
-
-          catatan:
-            catatan
-
-        }
-      );
-
-
-    if (
-      result &&
-      result.success === false
-    ) {
-
-      throw new Error(
-        result.message ||
-        "Gagal menarik modal."
-      );
-
-    }
-
-
-    if (
-      result &&
-      result.data
-    ) {
-
-      applyApiData(
-        result
-      );
-
-    }
-
-    else {
-
-      await loadTradingData(
-        false
-      );
-
-    }
-
-
-    closeModal(
-      withdrawModal
-    );
-
-
-    if (
-      withdrawModalForm
-    ) {
-
-      withdrawModalForm.reset();
-
-    }
-
-
-    setToday(
-      "withdrawModalTanggal"
-    );
-
-
-    showToast(
-      "success",
-      "Berhasil",
-      "Penarikan modal berhasil disimpan."
-    );
-
-
-  } catch (error) {
-
-    console.error(
-      "[Trading] Withdraw error:",
-      error
-    );
-
-
-    showToast(
-      "error",
-      "Gagal",
-      getTradingErrorMessage(
-        error
-      )
-    );
-
-
-  } finally {
-
-    setGlobalLoading(
-      false
-    );
-
-  }
-
-}
-
-
-/* =========================================================
-   OPEN MODAL
-========================================================= */
-
-function openModal(
-  modal
-) {
-
-  if (!modal) {
-
-    return;
-
-  }
-
-
-  modal.classList.remove(
-    "hidden"
-  );
-
-
-  document.body.classList.add(
-    "modal-open"
-  );
-
-
-  /*
-   * Set tanggal otomatis.
-   */
-
-  if (
-    modal === addModal
-  ) {
-
-    setToday(
-      "addModalTanggal"
-    );
-
-  }
-
-
-  if (
-    modal === withdrawModal
-  ) {
-
-    setToday(
-      "withdrawModalTanggal"
-    );
-
-  }
-
-
-  /*
-   * Fokus input nominal.
-   */
-
-  setTimeout(
-    function() {
-
-      if (
-        modal === addModal
-      ) {
-
-        $("addModalNominal")?.focus();
-
-      }
-
-      else if (
-        modal === withdrawModal
-      ) {
-
-        $("withdrawModalNominal")?.focus();
-
-      }
-
-    },
-    100
-  );
-
-}
-
-
-/* =========================================================
-   CLOSE MODAL
-========================================================= */
-
-function closeModal(
-  modal
-) {
-
-  if (!modal) {
-
-    return;
-
-  }
-
-
-  modal.classList.add(
-    "hidden"
-  );
-
-
-  document.body.classList.remove(
-    "modal-open"
-  );
-
-}
-
-
-/* =========================================================
-   TRANSACTION LOADING
-========================================================= */
-
-function setTransactionLoading(
-  loading
-) {
-
-  if (loading) {
-
-    showElement(
-      transactionLoading
-    );
-
-    hideElement(
-      transactionEmpty
-    );
-
-    hideElement(
-      transactionTableWrapper
-    );
-
-  }
-
-  else {
-
-    hideElement(
-      transactionLoading
-    );
-
-  }
-
-}
-
-
-/* =========================================================
-   EMPTY
-========================================================= */
-
-function showTransactionEmpty() {
-
-  hideElement(
-    transactionLoading
-  );
-
-  hideElement(
-    transactionTableWrapper
-  );
-
-  showElement(
-    transactionEmpty
-  );
-
-}
-
-
-/* =========================================================
-   ERROR STATE
-========================================================= */
-
-function renderTransactionsError() {
-
-  hideElement(
-    transactionLoading
-  );
-
-  hideElement(
-    transactionTableWrapper
-  );
-
-
-  if (transactionEmpty) {
-
-    transactionEmpty.classList.remove(
-      "hidden"
-    );
-
-
-    transactionEmpty.innerHTML =
-      `
-        <div class="empty-icon">!</div>
-        <h3>Gagal memuat transaksi</h3>
-        <p>
-          Periksa koneksi Google Apps Script lalu coba lagi.
-        </p>
-        <button
-          type="button"
-          id="retryTradingButton"
-          class="secondary-button"
-        >
-          Coba Lagi
-        </button>
-      `;
-
-
-    $("retryTradingButton")?.addEventListener(
-      "click",
-      function() {
-
-        loadTradingData(
-          true
-        );
-
-      }
-    );
-
-  }
-
-}
-
-
-/* =========================================================
-   GLOBAL LOADING
-========================================================= */
-
-function setGlobalLoading(
-  loading,
-  message = "Memproses..."
-) {
-
-  if (!globalLoading) {
-
-    return;
-
-  }
-
-
-  if (loading) {
-
-    if (globalLoadingText) {
-
-      globalLoadingText.textContent =
-        message;
-
-    }
-
-    globalLoading.classList.remove(
-      "hidden"
-    );
-
-  }
-
-  else {
-
-    globalLoading.classList.add(
-      "hidden"
-    );
-
-  }
-
-}
-
-
-/* =========================================================
-   TOAST
-========================================================= */
-
-let toastTimer =
-  null;
-
-
-function showToast(
-  type,
-  title,
-  message
-) {
-
-  if (!toast) {
-
-    return;
-
-  }
-
-
-  const toastTitle =
-    $("toastTitle");
-
-  const toastMessage =
-    $("toastMessage");
-
-  const toastIcon =
-    $("toastIcon");
 
 
   if (toastTitle) {
@@ -6029,63 +2332,14 @@ function showToast(
   }
 
 
-  if (toastIcon) {
-
-    if (type === "error") {
-
-      toastIcon.textContent =
-        "×";
-
-    }
-
-    else if (
-      type === "info"
-    ) {
-
-      toastIcon.textContent =
-        "i";
-
-    }
-
-    else {
-
-      toastIcon.textContent =
-        "✓";
-
-    }
-
-  }
-
-
-  toast.classList.remove(
-    "hidden",
-    "toast-success",
-    "toast-error",
-    "toast-info"
+  clearTimeout(
+    window.__tradingToastTimer
   );
 
 
-  toast.classList.add(
-    "toast-" +
-    (
-      type ||
-      "success"
-    )
-  );
-
-
-  if (toastTimer) {
-
-    clearTimeout(
-      toastTimer
-    );
-
-  }
-
-
-  toastTimer =
+  window.__tradingToastTimer =
     setTimeout(
-      function() {
+      function () {
 
         toast.classList.add(
           "hidden"
@@ -6099,41 +2353,61 @@ function showToast(
 
 
 /* =========================================================
-   GENERIC ELEMENT
+   HELPERS
 ========================================================= */
 
-function showElement(
-  element
+function getInputValue(
+  id
 ) {
+
+  const element =
+    document.getElementById(
+      id
+    );
+
 
   if (!element) {
 
-    return;
+    return "";
 
   }
 
 
-  element.classList.remove(
-    "hidden"
-  );
+  return String(
+    element.value || ""
+  ).trim();
 
 }
 
 
-function hideElement(
-  element
+function getInputNumber(
+  id
 ) {
 
-  if (!element) {
+  const value =
+    getInputValue(
+      id
+    );
 
-    return;
+
+  if (!value) {
+
+    return 0;
 
   }
 
 
-  element.classList.add(
-    "hidden"
-  );
+  const number =
+    Number(
+      value
+    );
+
+
+  return Number.isFinite(
+    number
+  )
+    ? number
+    : 0;
 
 }
 
@@ -6143,13 +2417,15 @@ function setInputValue(
   value
 ) {
 
-  const input =
-    $(id);
+  const element =
+    document.getElementById(
+      id
+    );
 
 
-  if (input) {
+  if (element) {
 
-    input.value =
+    element.value =
       value ??
       "";
 
@@ -6158,157 +2434,84 @@ function setInputValue(
 }
 
 
-/* =========================================================
-   DATE HELPERS
-========================================================= */
+function setText(
+  id,
+  value
+) {
 
-function getTodayStringTrading() {
+  const element =
+    document.getElementById(
+      id
+    );
 
-  const now =
-    new Date();
+
+  if (element) {
+
+    element.textContent =
+      value;
+
+  }
+
+}
 
 
-  return (
-    now.getFullYear() +
-    "-" +
-    String(
-      now.getMonth() + 1
-    )
-    .padStart(
-      2,
-      "0"
-    ) +
-    "-" +
-    String(
-      now.getDate()
-    )
-    .padStart(
-      2,
-      "0"
-    )
+function toNumber(
+  value
+) {
+
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+
+    return 0;
+
+  }
+
+
+  const number =
+    Number(
+      String(value)
+        .replace(
+          /[^\d.-]/g,
+          ""
+        )
+    );
+
+
+  return Number.isFinite(
+    number
+  )
+    ? number
+    : 0;
+
+}
+
+
+function formatNumber(
+  value
+) {
+
+  return new Intl.NumberFormat(
+    "id-ID"
+  ).format(
+    toNumber(value)
   );
 
 }
 
 
-function parseTradingDate(
+function formatRupiah(
   value
 ) {
-
-  if (!value) {
-
-    return new Date(0);
-
-  }
-
-
-  if (
-    value instanceof Date
-  ) {
-
-    return value;
-
-  }
-
-
-  const string =
-    String(value)
-      .trim();
-
-
-  /*
-   * YYYY-MM-DD
-   */
-
-  if (
-    /^\d{4}-\d{2}-\d{2}$/
-      .test(string)
-  ) {
-
-    const parts =
-      string.split("-");
-
-
-    return new Date(
-      Number(parts[0]),
-      Number(parts[1]) - 1,
-      Number(parts[2])
-    );
-
-  }
-
-
-  /*
-   * DD/MM/YYYY
-   */
-
-  if (
-    /^\d{2}\/\d{2}\/\d{4}$/
-      .test(string)
-  ) {
-
-    const parts =
-      string.split("/");
-
-
-    return new Date(
-      Number(parts[2]),
-      Number(parts[1]) - 1,
-      Number(parts[0])
-    );
-
-  }
-
-
-  const parsed =
-    new Date(string);
-
-
-  return isNaN(
-    parsed.getTime()
-  )
-    ? new Date(0)
-    : parsed;
-
-}
-
-
-function toInputDate(
-  value
-) {
-
-  const date =
-    parseTradingDate(
-      value
-    );
-
-
-  if (
-    date.getTime() === 0
-  ) {
-
-    return "";
-
-  }
-
 
   return (
-    date.getFullYear() +
-    "-" +
-    String(
-      date.getMonth() + 1
-    )
-    .padStart(
-      2,
-      "0"
-    ) +
-    "-" +
-    String(
-      date.getDate()
-    )
-    .padStart(
-      2,
-      "0"
+    "Rp" +
+    new Intl.NumberFormat(
+      "id-ID"
+    ).format(
+      toNumber(value)
     )
   );
 
@@ -6326,64 +2529,88 @@ function formatDisplayDate(
   }
 
 
-  const date =
-    parseTradingDate(
-      value
-    );
+  const string =
+    String(value)
+      .trim();
 
 
   if (
-    date.getTime() === 0
+    /^\d{4}-\d{2}-\d{2}$/.test(
+      string
+    )
   ) {
 
-    return String(value);
+    const parts =
+      string.split("-");
+
+
+    return (
+      parts[2] +
+      "/" +
+      parts[1] +
+      "/" +
+      parts[0]
+    );
 
   }
 
 
-  return (
-    String(
-      date.getDate()
-    )
-    .padStart(
-      2,
-      "0"
-    ) +
-    "/" +
-    String(
-      date.getMonth() + 1
-    )
-    .padStart(
-      2,
-      "0"
-    ) +
-    "/" +
-    date.getFullYear()
+  return string;
+
+}
+
+
+function getField(
+  object,
+  primary,
+  secondary
+) {
+
+  if (
+    object &&
+    object[primary] !== undefined
+  ) {
+
+    return object[primary];
+
+  }
+
+
+  if (
+    object &&
+    object[secondary] !== undefined
+  ) {
+
+    return object[secondary];
+
+  }
+
+
+  return "";
+
+}
+
+
+function getTransactionId(
+  transaction
+) {
+
+  return getField(
+    transaction,
+    "ID",
+    "id"
   );
 
 }
 
 
-/* =========================================================
-   ERROR MESSAGE
-========================================================= */
-
-function getTradingErrorMessage(
+function getErrorMessage(
   error
 ) {
 
   if (!error) {
 
     return "Terjadi kesalahan.";
-
-  }
-
-
-  if (
-    typeof error === "string"
-  ) {
-
-    return error;
 
   }
 
@@ -6404,28 +2631,981 @@ function getTradingErrorMessage(
 }
 
 
+function escapeHtml(
+  value
+) {
+
+  return String(
+    value ?? ""
+  )
+  .replace(
+    /&/g,
+    "&amp;"
+  )
+  .replace(
+    /</g,
+    "&lt;"
+  )
+  .replace(
+    />/g,
+    "&gt;"
+  )
+  .replace(
+    /"/g,
+    "&quot;"
+  )
+  .replace(
+    /'/g,
+    "&#039;"
+  );
+
+}
+
+
+function escapeAttribute(
+  value
+) {
+
+  return escapeHtml(
+    value
+  );
+
+}
+
+
+function getTodayString() {
+
+  const now =
+    new Date();
+
+
+  return (
+    now.getFullYear() +
+    "-" +
+    String(
+      now.getMonth() + 1
+    ).padStart(
+      2,
+      "0"
+    ) +
+    "-" +
+    String(
+      now.getDate()
+    ).padStart(
+      2,
+      "0"
+    )
+  );
+
+}
+
+
 /* =========================================================
-   EVENT: PROFIT/RUGI
+   GLOBAL FUNCTIONS
 ========================================================= */
 
-function bindProfitRugi() {
+window.TradingPage = {
 
-  const select =
-    $("profitRugi");
+  load:
+    loadTradingData,
+
+  refresh:
+    refreshTradingData,
+
+  edit:
+    handleEditTransaction,
+
+  remove:
+    handleDeleteTransaction,
+
+  openModal:
+    openModal,
+
+  closeModal:
+    closeModal,
+
+  closeAllModals:
+    closeAllModals
+
+};
 
 
-  if (!select) {
+console.log(
+  "[Trading] Stage 1 loaded."
+);
+
+/* =========================================================
+   TRADING JOURNAL
+   trading.js
+   STAGE 2 / FINAL
+   EDIT + DELETE + MODAL + REFRESH + UI
+========================================================= */
+
+"use strict";
+
+
+/* =========================================================
+   STATE
+========================================================= */
+
+let editingTransactionId = null;
+
+
+/* =========================================================
+   DOM HELPER
+========================================================= */
+
+function el(id) {
+  return document.getElementById(id);
+}
+
+
+/* =========================================================
+   ESCAPE HTML
+========================================================= */
+
+function escapeHtml(value) {
+
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
+}
+
+
+/* =========================================================
+   FORMAT RUPIAH
+========================================================= */
+
+function formatRupiah(value) {
+
+  const number = Number(value) || 0;
+
+  return new Intl.NumberFormat(
+    "id-ID",
+    {
+      style: "currency",
+      currency: "IDR",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }
+  ).format(number);
+
+}
+
+
+/* =========================================================
+   FORMAT NUMBER
+========================================================= */
+
+function formatNumber(value) {
+
+  return new Intl.NumberFormat(
+    "id-ID"
+  ).format(
+    Number(value) || 0
+  );
+
+}
+
+
+/* =========================================================
+   FORMAT DATE
+========================================================= */
+
+function formatTanggal(value) {
+
+  if (!value) {
+    return "-";
+  }
+
+  const text = String(value);
+
+  /*
+   * YYYY-MM-DD
+   */
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+
+    const parts = text.split("-");
+
+    return (
+      parts[2] +
+      "/" +
+      parts[1] +
+      "/" +
+      parts[0]
+    );
+
+  }
+
+  /*
+   * Jika sudah tanggal lain,
+   * coba Date.
+   */
+
+  const date = new Date(value);
+
+  if (!isNaN(date.getTime())) {
+
+    return new Intl.DateTimeFormat(
+      "id-ID",
+      {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric"
+      }
+    ).format(date);
+
+  }
+
+  return escapeHtml(value);
+
+}
+
+
+/* =========================================================
+   TODAY
+========================================================= */
+
+function todayString() {
+
+  const now = new Date();
+
+  return (
+    now.getFullYear() +
+    "-" +
+    String(
+      now.getMonth() + 1
+    ).padStart(2, "0") +
+    "-" +
+    String(
+      now.getDate()
+    ).padStart(2, "0")
+  );
+
+}
+
+
+/* =========================================================
+   SET INPUT TODAY
+========================================================= */
+
+function setDefaultDates() {
+
+  const today = todayString();
+
+  const tanggal = el("tanggal");
+  const addTanggal = el("addModalTanggal");
+  const withdrawTanggal = el("withdrawModalTanggal");
+
+  if (tanggal && !tanggal.value) {
+    tanggal.value = today;
+  }
+
+  if (addTanggal && !addTanggal.value) {
+    addTanggal.value = today;
+  }
+
+  if (withdrawTanggal && !withdrawTanggal.value) {
+    withdrawTanggal.value = today;
+  }
+
+}
+
+
+/* =========================================================
+   SHOW GLOBAL LOADING
+========================================================= */
+
+function showLoading(message = "Memproses...") {
+
+  const loading = el("globalLoading");
+  const text = el("globalLoadingText");
+
+  if (text) {
+    text.textContent = message;
+  }
+
+  if (loading) {
+    loading.classList.remove("hidden");
+  }
+
+}
+
+
+/* =========================================================
+   HIDE GLOBAL LOADING
+========================================================= */
+
+function hideLoading() {
+
+  const loading = el("globalLoading");
+
+  if (loading) {
+    loading.classList.add("hidden");
+  }
+
+}
+
+
+/* =========================================================
+   SHOW TOAST
+========================================================= */
+
+let toastTimer = null;
+
+function showToast(
+  message,
+  type = "success",
+  title = ""
+) {
+
+  const toast = el("toast");
+  const toastIcon = el("toastIcon");
+  const toastTitle = el("toastTitle");
+  const toastMessage = el("toastMessage");
+
+  if (!toast) {
+    return;
+  }
+
+  if (!title) {
+
+    title =
+      type === "error"
+        ? "Gagal"
+        : type === "warning"
+          ? "Peringatan"
+          : "Berhasil";
+
+  }
+
+  if (toastTitle) {
+    toastTitle.textContent = title;
+  }
+
+  if (toastMessage) {
+    toastMessage.textContent = message;
+  }
+
+  if (toastIcon) {
+
+    toastIcon.textContent =
+      type === "error"
+        ? "!"
+        : type === "warning"
+          ? "!"
+          : "✓";
+
+  }
+
+  toast.classList.remove(
+    "hidden",
+    "success",
+    "error",
+    "warning"
+  );
+
+  toast.classList.add(type);
+
+  clearTimeout(toastTimer);
+
+  toastTimer = setTimeout(
+    function () {
+
+      toast.classList.add("hidden");
+
+    },
+    3500
+  );
+
+}
+
+
+/* =========================================================
+   CLOSE TOAST
+========================================================= */
+
+function hideToast() {
+
+  const toast = el("toast");
+
+  if (toast) {
+    toast.classList.add("hidden");
+  }
+
+}
+
+
+/* =========================================================
+   OPEN MODAL
+========================================================= */
+
+function openModal(id) {
+
+  const modal = el(id);
+
+  if (!modal) {
+    return;
+  }
+
+  modal.classList.remove("hidden");
+
+  document.body.classList.add("modal-open");
+
+}
+
+
+/* =========================================================
+   CLOSE MODAL
+========================================================= */
+
+function closeModal(id) {
+
+  const modal = el(id);
+
+  if (!modal) {
+    return;
+  }
+
+  modal.classList.add("hidden");
+
+  document.body.classList.remove("modal-open");
+
+}
+
+
+/* =========================================================
+   CLOSE ALL MODAL
+========================================================= */
+
+function closeAllModals() {
+
+  closeModal("addModal");
+  closeModal("withdrawModal");
+
+}
+
+
+/* =========================================================
+   NORMALIZE ROW
+========================================================= */
+
+function normalizeRow(row) {
+
+  if (!row || typeof row !== "object") {
+    return {};
+  }
+
+  return {
+
+    id:
+      row.ID ??
+      row.id ??
+      "",
+
+    tanggal:
+      row.Tanggal ??
+      row.tanggal ??
+      "",
+
+    saham:
+      row.Saham ??
+      row.saham ??
+      "",
+
+    aksi:
+      row.Aksi ??
+      row.aksi ??
+      "",
+
+    harga:
+      row.Harga ??
+      row.harga ??
+      0,
+
+    lot:
+      row.Lot ??
+      row.lot ??
+      0,
+
+    profitRugi:
+      row["Profit/Rugi"] ??
+      row.profitRugi ??
+      row.hasil ??
+      "",
+
+    nominal:
+      row.Nominal ??
+      row.nominal ??
+      0,
+
+    catatan:
+      row.Catatan ??
+      row.catatan ??
+      "",
+
+    timestamp:
+      row.Timestamp ??
+      row.timestamp ??
+      ""
+
+  };
+
+}
+
+
+/* =========================================================
+   GET TRANSACTION DATA
+========================================================= */
+
+async function loadTransactions() {
+
+  setTransactionLoading(true);
+
+  try {
+
+    const result =
+      await TradingAPI.getAllData();
+
+    const data =
+      result?.data ||
+      result ||
+      {};
+
+    const transaksi =
+      Array.isArray(data.transaksi)
+        ? data.transaksi
+        : Array.isArray(data.transactions)
+          ? data.transactions
+          : [];
+
+    renderTransactions(transaksi);
+
+    renderSummary(
+      data.summary || {}
+    );
+
+  } catch (error) {
+
+    console.error(
+      "[Trading] loadTransactions:",
+      error
+    );
+
+    renderTransactions([]);
+
+    showToast(
+      error.message ||
+      "Gagal mengambil data dari Google Sheets.",
+      "error"
+    );
+
+  } finally {
+
+    setTransactionLoading(false);
+
+  }
+
+}
+
+
+/* =========================================================
+   LOADING TRANSACTION STATE
+========================================================= */
+
+function setTransactionLoading(isLoading) {
+
+  const loading =
+    el("transactionLoading");
+
+  const empty =
+    el("transactionEmpty");
+
+  const table =
+    el("transactionTableWrapper");
+
+  if (isLoading) {
+
+    if (loading) {
+      loading.classList.remove("hidden");
+    }
+
+    if (empty) {
+      empty.classList.add("hidden");
+    }
+
+    if (table) {
+      table.classList.add("hidden");
+    }
 
     return;
 
   }
 
+  if (loading) {
+    loading.classList.add("hidden");
+  }
 
-  select.addEventListener(
-    "change",
-    updateNominalVisibility
+}
+
+
+/* =========================================================
+   RENDER TRANSACTIONS
+========================================================= */
+
+function renderTransactions(
+  transactions
+) {
+
+  const tbody =
+    el("transactionTableBody");
+
+  const empty =
+    el("transactionEmpty");
+
+  const table =
+    el("transactionTableWrapper");
+
+  if (!tbody) {
+    return;
+  }
+
+  tbody.innerHTML = "";
+
+  if (
+    !Array.isArray(transactions) ||
+    transactions.length === 0
+  ) {
+
+    if (empty) {
+      empty.classList.remove("hidden");
+    }
+
+    if (table) {
+      table.classList.add("hidden");
+    }
+
+    return;
+
+  }
+
+  /*
+   * Terbaru di atas.
+   */
+
+  const rows =
+    [...transactions]
+      .reverse();
+
+  rows.forEach(
+    function(raw) {
+
+      const row =
+        normalizeRow(raw);
+
+      const tr =
+        document.createElement("tr");
+
+      const hasil =
+        String(
+          row.profitRugi || ""
+        ).toUpperCase();
+
+      let hasilClass = "";
+
+      if (hasil === "PROFIT") {
+        hasilClass = "profit";
+      }
+
+      if (hasil === "RUGI") {
+        hasilClass = "loss";
+      }
+
+      const aksi =
+        String(row.aksi || "")
+          .toUpperCase();
+
+      const aksiClass =
+        aksi === "BUY"
+          ? "buy"
+          : aksi === "SELL"
+            ? "sell"
+            : "";
+
+      tr.innerHTML = `
+
+        <td>
+          ${escapeHtml(
+            formatTanggal(row.tanggal)
+          )}
+        </td>
+
+        <td>
+          <strong>
+            ${escapeHtml(row.saham)}
+          </strong>
+        </td>
+
+        <td>
+          <span class="trade-badge ${aksiClass}">
+            ${escapeHtml(aksi)}
+          </span>
+        </td>
+
+        <td>
+          ${formatNumber(row.harga)}
+        </td>
+
+        <td>
+          ${formatNumber(row.lot)}
+        </td>
+
+        <td>
+          ${
+            hasil
+              ? `
+                <span class="result-badge ${hasilClass}">
+                  ${escapeHtml(hasil)}
+                </span>
+              `
+              : "-"
+          }
+        </td>
+
+        <td>
+          ${
+            hasil
+              ? formatRupiah(row.nominal)
+              : "-"
+          }
+        </td>
+
+        <td class="transaction-actions">
+
+          <button
+            type="button"
+            class="table-action edit"
+            data-action="edit"
+            data-id="${escapeHtml(row.id)}"
+          >
+            Edit
+          </button>
+
+          <button
+            type="button"
+            class="table-action delete"
+            data-action="delete"
+            data-id="${escapeHtml(row.id)}"
+          >
+            Hapus
+          </button>
+
+        </td>
+
+      `;
+
+      tbody.appendChild(tr);
+
+    }
   );
 
+  if (empty) {
+    empty.classList.add("hidden");
+  }
+
+  if (table) {
+    table.classList.remove("hidden");
+  }
+
+}
+
+
+/* =========================================================
+   RENDER SUMMARY
+========================================================= */
+
+function renderSummary(summary) {
+
+  if (!summary) {
+    summary = {};
+  }
+
+  const modal =
+    Number(summary.modal) || 0;
+
+  const netProfit =
+    Number(summary.netProfit) || 0;
+
+  const total =
+    Number(summary.total) ||
+    modal + netProfit;
+
+  const modalValue =
+    el("modalValue");
+
+  const profitLossValue =
+    el("profitLossValue");
+
+  const totalValue =
+    el("totalValue");
+
+  const profitDescription =
+    el("profitLossDescription");
+
+  const profitIcon =
+    el("profitIcon");
+
+  if (modalValue) {
+    modalValue.textContent =
+      formatRupiah(modal);
+  }
+
+  if (profitLossValue) {
+
+    profitLossValue.textContent =
+      formatRupiah(netProfit);
+
+    profitLossValue.classList.remove(
+      "positive",
+      "negative"
+    );
+
+    if (netProfit > 0) {
+      profitLossValue.classList.add(
+        "positive"
+      );
+    }
+
+    if (netProfit < 0) {
+      profitLossValue.classList.add(
+        "negative"
+      );
+    }
+
+  }
+
+  if (totalValue) {
+    totalValue.textContent =
+      formatRupiah(total);
+  }
+
+  if (profitDescription) {
+
+    if (netProfit > 0) {
+
+      profitDescription.textContent =
+        "Trading menghasilkan profit";
+
+    } else if (netProfit < 0) {
+
+      profitDescription.textContent =
+        "Trading mengalami kerugian";
+
+    } else {
+
+      profitDescription.textContent =
+        "Net hasil trading";
+
+    }
+
+  }
+
+  if (profitIcon) {
+
+    profitIcon.textContent =
+      netProfit >= 0
+        ? "↗"
+        : "↘";
+
+  }
+
+}
+
+
+/* =========================================================
+   READ TRANSACTION FORM
+========================================================= */
+
+function getTransactionFormData() {
+
+  const data = {
+
+    tanggal:
+      el("tanggal")?.value || "",
+
+    saham:
+      el("saham")?.value || "",
+
+    aksi:
+      el("aksi")?.value || "",
+
+    harga:
+      Number(
+        el("harga")?.value || 0
+      ),
+
+    lot:
+      Number(
+        el("lot")?.value || 0
+      ),
+
+    profitRugi:
+      el("profitRugi")?.value || "",
+
+    nominal:
+      Number(
+        el("nominal")?.value || 0
+      ),
+
+    catatan:
+      el("catatan")?.value || ""
+
+  };
+
+  return data;
+
+}
+
+
+/* =========================================================
+   CLEAR TRANSACTION FORM
+========================================================= */
+
+function clearTransactionForm() {
+
+  const form =
+    el("transactionForm");
+
+  if (form) {
+    form.reset();
+  }
+
+  const tanggal =
+    el("tanggal");
+
+  if (tanggal) {
+    tanggal.value =
+      todayString();
+  }
+
+  const aksi =
+    el("aksi");
+
+  if (aksi) {
+    aksi.value = "BUY";
+  }
+
+  const profitRugi =
+    el("profitRugi");
+
+  if (profitRugi) {
+    profitRugi.value = "";
+  }
 
   updateNominalVisibility();
 
@@ -6433,49 +3613,925 @@ function bindProfitRugi() {
 
 
 /* =========================================================
-   EVENT: MODAL BUTTONS
+   NOMINAL VISIBILITY
 ========================================================= */
 
-function bindModalEvents() {
+function updateNominalVisibility() {
+
+  const select =
+    el("profitRugi");
+
+  const group =
+    el("nominalGroup");
+
+  const nominal =
+    el("nominal");
+
+  if (!select || !group) {
+    return;
+  }
+
+  const hasResult =
+    select.value === "PROFIT" ||
+    select.value === "RUGI";
+
+  if (hasResult) {
+
+    group.classList.remove("hidden");
+
+    if (nominal) {
+      nominal.required = true;
+    }
+
+  } else {
+
+    group.classList.add("hidden");
+
+    if (nominal) {
+
+      nominal.required = false;
+      nominal.value = "";
+
+    }
+
+  }
+
+}
+
+
+/* =========================================================
+   SAVE TRANSACTION
+========================================================= */
+
+async function handleTransactionSubmit(event) {
+
+  event.preventDefault();
+
+  const form =
+    event.currentTarget;
 
   if (
-    addModalButton
+    form &&
+    !form.checkValidity()
   ) {
 
-    addModalButton.addEventListener(
-      "click",
-      function() {
+    form.reportValidity();
 
-        openModal(
-          addModal
+    return;
+
+  }
+
+  try {
+
+    const data =
+      getTransactionFormData();
+
+    showLoading(
+      editingTransactionId
+        ? "Mengubah transaksi..."
+        : "Menyimpan transaksi..."
+    );
+
+    let result;
+
+    if (editingTransactionId) {
+
+      result =
+        await TradingAPI.updateTransaction(
+          editingTransactionId,
+          data
         );
 
+    } else {
+
+      result =
+        await TradingAPI.addTransaction(
+          data
+        );
+
+    }
+
+    console.log(
+      "[Trading] save result:",
+      result
+    );
+
+    editingTransactionId = null;
+
+    clearTransactionForm();
+
+    setTransactionEditMode(false);
+
+    await loadTransactions();
+
+    showToast(
+      result?.message ||
+      "Transaksi berhasil disimpan.",
+      "success"
+    );
+
+  } catch (error) {
+
+    console.error(
+      "[Trading] save transaction:",
+      error
+    );
+
+    showToast(
+      error.message ||
+      "Gagal menyimpan transaksi.",
+      "error"
+    );
+
+  } finally {
+
+    hideLoading();
+
+  }
+
+}
+
+
+/* =========================================================
+   EDIT MODE
+========================================================= */
+
+function setTransactionEditMode(isEdit) {
+
+  const button =
+    el("saveTransactionButton");
+
+  if (!button) {
+    return;
+  }
+
+  const span =
+    button.querySelector("span");
+
+  if (span) {
+
+    span.textContent =
+      isEdit
+        ? "Update Transaksi"
+        : "Simpan Transaksi";
+
+  }
+
+}
+
+
+/* =========================================================
+   FIND TRANSACTION
+========================================================= */
+
+async function findTransactionById(id) {
+
+  const result =
+    await TradingAPI.getAllData();
+
+  const data =
+    result?.data ||
+    result ||
+    {};
+
+  const transactions =
+    Array.isArray(data.transaksi)
+      ? data.transaksi
+      : [];
+
+  return transactions
+    .map(normalizeRow)
+    .find(
+      function(row) {
+
+        return String(row.id) ===
+          String(id);
+
       }
+    );
+
+}
+
+
+/* =========================================================
+   START EDIT
+========================================================= */
+
+async function startEditTransaction(id) {
+
+  if (!id) {
+
+    showToast(
+      "ID transaksi tidak ditemukan.",
+      "error"
+    );
+
+    return;
+
+  }
+
+  try {
+
+    showLoading(
+      "Memuat transaksi..."
+    );
+
+    const row =
+      await findTransactionById(id);
+
+    if (!row) {
+
+      throw new Error(
+        "Transaksi tidak ditemukan."
+      );
+
+    }
+
+    editingTransactionId =
+      id;
+
+    if (el("tanggal")) {
+      el("tanggal").value =
+        convertDateForInput(
+          row.tanggal
+        );
+    }
+
+    if (el("saham")) {
+      el("saham").value =
+        row.saham || "";
+    }
+
+    if (el("aksi")) {
+      el("aksi").value =
+        row.aksi || "BUY";
+    }
+
+    if (el("harga")) {
+      el("harga").value =
+        row.harga || "";
+    }
+
+    if (el("lot")) {
+      el("lot").value =
+        row.lot || "";
+    }
+
+    if (el("profitRugi")) {
+      el("profitRugi").value =
+        row.profitRugi || "";
+    }
+
+    if (el("nominal")) {
+      el("nominal").value =
+        row.nominal || "";
+    }
+
+    if (el("catatan")) {
+      el("catatan").value =
+        row.catatan || "";
+    }
+
+    updateNominalVisibility();
+
+    setTransactionEditMode(true);
+
+    const form =
+      el("transactionForm");
+
+    if (form) {
+
+      form.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+
+    }
+
+    showToast(
+      "Data transaksi dimuat untuk diedit.",
+      "success"
+    );
+
+  } catch (error) {
+
+    console.error(
+      "[Trading] edit:",
+      error
+    );
+
+    showToast(
+      error.message ||
+      "Gagal memuat transaksi.",
+      "error"
+    );
+
+  } finally {
+
+    hideLoading();
+
+  }
+
+}
+
+
+/* =========================================================
+   CONVERT DATE FOR INPUT
+========================================================= */
+
+function convertDateForInput(value) {
+
+  if (!value) {
+    return "";
+  }
+
+  const text =
+    String(value).trim();
+
+  /*
+   * Sudah YYYY-MM-DD
+   */
+
+  if (
+    /^\d{4}-\d{2}-\d{2}$/.test(text)
+  ) {
+
+    return text;
+
+  }
+
+  /*
+   * DD/MM/YYYY
+   */
+
+  const match =
+    text.match(
+      /^(\d{2})\/(\d{2})\/(\d{4})$/
+    );
+
+  if (match) {
+
+    return (
+      match[3] +
+      "-" +
+      match[2] +
+      "-" +
+      match[1]
+    );
+
+  }
+
+  const date =
+    new Date(text);
+
+  if (isNaN(date.getTime())) {
+    return "";
+  }
+
+  return (
+    date.getFullYear() +
+    "-" +
+    String(
+      date.getMonth() + 1
+    ).padStart(2, "0") +
+    "-" +
+    String(
+      date.getDate()
+    ).padStart(2, "0")
+  );
+
+}
+
+
+/* =========================================================
+   CANCEL EDIT
+========================================================= */
+
+function cancelEditTransaction() {
+
+  editingTransactionId = null;
+
+  clearTransactionForm();
+
+  setTransactionEditMode(false);
+
+  showToast(
+    "Edit transaksi dibatalkan.",
+    "success"
+  );
+
+}
+
+
+/* =========================================================
+   DELETE CONFIRM
+========================================================= */
+
+async function handleDeleteTransaction(id) {
+
+  if (!id) {
+
+    showToast(
+      "ID transaksi tidak ditemukan.",
+      "error"
+    );
+
+    return;
+
+  }
+
+  const confirmed =
+    window.confirm(
+      "Hapus transaksi ini?\n\nData yang sudah dihapus tidak dapat dikembalikan."
+    );
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+
+    showLoading(
+      "Menghapus transaksi..."
+    );
+
+    const result =
+      await TradingAPI.deleteTransaction(
+        id
+      );
+
+    if (
+      String(editingTransactionId) ===
+      String(id)
+    ) {
+
+      editingTransactionId = null;
+
+      clearTransactionForm();
+
+      setTransactionEditMode(false);
+
+    }
+
+    await loadTransactions();
+
+    showToast(
+      result?.message ||
+      "Transaksi berhasil dihapus.",
+      "success"
+    );
+
+  } catch (error) {
+
+    console.error(
+      "[Trading] delete:",
+      error
+    );
+
+    showToast(
+      error.message ||
+      "Gagal menghapus transaksi.",
+      "error"
+    );
+
+  } finally {
+
+    hideLoading();
+
+  }
+
+}
+
+
+/* =========================================================
+   TABLE ACTION
+========================================================= */
+
+function handleTableClick(event) {
+
+  const button =
+    event.target.closest(
+      "[data-action]"
+    );
+
+  if (!button) {
+    return;
+  }
+
+  const action =
+    button.dataset.action;
+
+  const id =
+    button.dataset.id;
+
+  if (action === "edit") {
+
+    startEditTransaction(id);
+
+    return;
+
+  }
+
+  if (action === "delete") {
+
+    handleDeleteTransaction(id);
+
+  }
+
+}
+
+
+/* =========================================================
+   ADD MODAL FORM
+========================================================= */
+
+async function handleAddModalSubmit(event) {
+
+  event.preventDefault();
+
+  const tanggal =
+    el("addModalTanggal")?.value ||
+    todayString();
+
+  const nominal =
+    Number(
+      el("addModalNominal")?.value || 0
+    );
+
+  const catatan =
+    el("addModalCatatan")?.value ||
+    "";
+
+  if (!tanggal) {
+
+    showToast(
+      "Tanggal modal wajib diisi.",
+      "error"
+    );
+
+    return;
+
+  }
+
+  if (
+    !Number.isFinite(nominal) ||
+    nominal <= 0
+  ) {
+
+    showToast(
+      "Nominal tambah modal harus lebih dari 0.",
+      "error"
+    );
+
+    return;
+
+  }
+
+  try {
+
+    showLoading(
+      "Menambahkan modal..."
+    );
+
+    const result =
+      await TradingAPI.addCapital(
+        nominal,
+        catatan,
+        tanggal
+      );
+
+    const form =
+      el("addModalForm");
+
+    if (form) {
+      form.reset();
+    }
+
+    if (el("addModalTanggal")) {
+      el("addModalTanggal").value =
+        todayString();
+    }
+
+    closeModal("addModal");
+
+    await loadTransactions();
+
+    showToast(
+      result?.message ||
+      "Modal berhasil ditambahkan.",
+      "success"
+    );
+
+  } catch (error) {
+
+    console.error(
+      "[Trading] add capital:",
+      error
+    );
+
+    showToast(
+      error.message ||
+      "Gagal menambahkan modal.",
+      "error"
+    );
+
+  } finally {
+
+    hideLoading();
+
+  }
+
+}
+
+
+/* =========================================================
+   WITHDRAW MODAL FORM
+========================================================= */
+
+async function handleWithdrawModalSubmit(event) {
+
+  event.preventDefault();
+
+  const tanggal =
+    el("withdrawModalTanggal")?.value ||
+    todayString();
+
+  const nominal =
+    Number(
+      el("withdrawModalNominal")?.value || 0
+    );
+
+  const catatan =
+    el("withdrawModalCatatan")?.value ||
+    "";
+
+  if (!tanggal) {
+
+    showToast(
+      "Tanggal penarikan wajib diisi.",
+      "error"
+    );
+
+    return;
+
+  }
+
+  if (
+    !Number.isFinite(nominal) ||
+    nominal <= 0
+  ) {
+
+    showToast(
+      "Nominal penarikan harus lebih dari 0.",
+      "error"
+    );
+
+    return;
+
+  }
+
+  try {
+
+    showLoading(
+      "Menarik modal..."
+    );
+
+    const result =
+      await TradingAPI.withdrawCapital(
+        nominal,
+        catatan,
+        tanggal
+      );
+
+    const form =
+      el("withdrawModalForm");
+
+    if (form) {
+      form.reset();
+    }
+
+    if (el("withdrawModalTanggal")) {
+      el("withdrawModalTanggal").value =
+        todayString();
+    }
+
+    closeModal("withdrawModal");
+
+    await loadTransactions();
+
+    showToast(
+      result?.message ||
+      "Modal berhasil ditarik.",
+      "success"
+    );
+
+  } catch (error) {
+
+    console.error(
+      "[Trading] withdraw capital:",
+      error
+    );
+
+    showToast(
+      error.message ||
+      "Gagal menarik modal.",
+      "error"
+    );
+
+  } finally {
+
+    hideLoading();
+
+  }
+
+}
+
+
+/* =========================================================
+   OPEN ADD MODAL
+========================================================= */
+
+function openAddCapitalModal() {
+
+  const form =
+    el("addModalForm");
+
+  if (form) {
+    form.reset();
+  }
+
+  if (el("addModalTanggal")) {
+    el("addModalTanggal").value =
+      todayString();
+  }
+
+  openModal("addModal");
+
+}
+
+
+/* =========================================================
+   OPEN WITHDRAW MODAL
+========================================================= */
+
+function openWithdrawCapitalModal() {
+
+  const form =
+    el("withdrawModalForm");
+
+  if (form) {
+    form.reset();
+  }
+
+  if (el("withdrawModalTanggal")) {
+    el("withdrawModalTanggal").value =
+      todayString();
+  }
+
+  openModal("withdrawModal");
+
+}
+
+
+/* =========================================================
+   MODAL BACKDROP
+========================================================= */
+
+function handleModalOverlayClick(event) {
+
+  if (
+    event.target.classList.contains(
+      "modal-overlay"
+    )
+  ) {
+
+    event.target.classList.add(
+      "hidden"
+    );
+
+    document.body.classList.remove(
+      "modal-open"
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   KEYBOARD ESC
+========================================================= */
+
+function handleKeyboard(event) {
+
+  if (event.key !== "Escape") {
+    return;
+  }
+
+  closeAllModals();
+
+}
+
+
+/* =========================================================
+   BUTTON EVENT SETUP
+========================================================= */
+
+function setupButtons() {
+
+  const addButton =
+    el("addModalButton");
+
+  if (addButton) {
+
+    addButton.addEventListener(
+      "click",
+      openAddCapitalModal
     );
 
   }
 
 
-  if (
-    withdrawModalButton
-  ) {
+  const withdrawButton =
+    el("withdrawModalButton");
 
-    withdrawModalButton.addEventListener(
+  if (withdrawButton) {
+
+    withdrawButton.addEventListener(
       "click",
-      function() {
+      openWithdrawCapitalModal
+    );
 
-        openModal(
-          withdrawModal
-        );
+  }
 
-      }
+
+  const transactionForm =
+    el("transactionForm");
+
+  if (transactionForm) {
+
+    transactionForm.addEventListener(
+      "submit",
+      handleTransactionSubmit
+    );
+
+  }
+
+
+  const addForm =
+    el("addModalForm");
+
+  if (addForm) {
+
+    addForm.addEventListener(
+      "submit",
+      handleAddModalSubmit
+    );
+
+  }
+
+
+  const withdrawForm =
+    el("withdrawModalForm");
+
+  if (withdrawForm) {
+
+    withdrawForm.addEventListener(
+      "submit",
+      handleWithdrawModalSubmit
+    );
+
+  }
+
+
+  const tableBody =
+    el("transactionTableBody");
+
+  if (tableBody) {
+
+    tableBody.addEventListener(
+      "click",
+      handleTableClick
+    );
+
+  }
+
+
+  const profitRugi =
+    el("profitRugi");
+
+  if (profitRugi) {
+
+    profitRugi.addEventListener(
+      "change",
+      updateNominalVisibility
     );
 
   }
 
 
   /*
-   * Semua tombol data-close-modal.
+   * Tombol tutup modal
    */
 
   document
@@ -6489,13 +4545,7 @@ function bindModalEvents() {
           "click",
           function() {
 
-            closeModal(
-              addModal
-            );
-
-            closeModal(
-              withdrawModal
-            );
+            closeAllModals();
 
           }
         );
@@ -6505,351 +4555,238 @@ function bindModalEvents() {
 
 
   /*
-   * Klik overlay untuk tutup.
+   * Klik backdrop
    */
 
-  [addModal, withdrawModal]
+  document
+    .querySelectorAll(
+      ".modal-overlay"
+    )
     .forEach(
       function(modal) {
 
-        if (!modal) {
-
-          return;
-
-        }
-
-
         modal.addEventListener(
           "click",
-          function(event) {
-
-            if (
-              event.target === modal
-            ) {
-
-              closeModal(
-                modal
-              );
-
-            }
-
-          }
+          handleModalOverlayClick
         );
 
       }
     );
 
-
-  /*
-   * ESC untuk tutup.
-   */
 
   document.addEventListener(
     "keydown",
-    function(event) {
-
-      if (
-        event.key === "Escape"
-      ) {
-
-        closeModal(
-          addModal
-        );
-
-        closeModal(
-          withdrawModal
-        );
-
-      }
-
-    }
+    handleKeyboard
   );
 
 }
 
 
 /* =========================================================
-   EVENT: FORMS
+   ADD CANCEL EDIT BUTTON
+   Dibuat otomatis jika HTML belum punya.
 ========================================================= */
 
-function bindFormEvents() {
+function createCancelEditButton() {
+
+  const form =
+    el("transactionForm");
+
+  const saveButton =
+    el("saveTransactionButton");
+
+  if (!form || !saveButton) {
+    return;
+  }
 
   if (
-    transactionForm
+    el("cancelEditButton")
   ) {
-
-    transactionForm.addEventListener(
-      "submit",
-      handleTransactionSubmit
-    );
-
+    return;
   }
 
+  const button =
+    document.createElement("button");
 
-  if (
-    addModalForm
-  ) {
+  button.type = "button";
+  button.id = "cancelEditButton";
+  button.className = "secondary-button";
+  button.textContent = "Batal Edit";
+  button.style.display = "none";
 
-    addModalForm.addEventListener(
-      "submit",
-      handleAddCapital
-    );
-
-  }
-
-
-  if (
-    withdrawModalForm
-  ) {
-
-    withdrawModalForm.addEventListener(
-      "submit",
-      handleWithdrawCapital
-    );
-
-  }
-
-}
-
-
-/* =========================================================
-   AUTO REFRESH
-========================================================= */
-
-let autoRefreshTimer =
-  null;
-
-
-function startAutoRefresh() {
-
-  if (autoRefreshTimer) {
-
-    clearInterval(
-      autoRefreshTimer
-    );
-
-  }
-
-
-  /*
-   * Refresh setiap 60 detik.
-   *
-   * Tidak mengganggu jika sedang
-   * menyimpan/edit/hapus.
-   */
-
-  autoRefreshTimer =
-    setInterval(
-      function() {
-
-        if (
-          TradingState.isSaving ||
-          TradingState.isLoading
-        ) {
-
-          return;
-
-        }
-
-
-        loadTradingData(
-          false
-        );
-
-      },
-      60000
-    );
-
-}
-
-
-/* =========================================================
-   PAGE VISIBILITY
-========================================================= */
-
-function bindVisibilityRefresh() {
-
-  document.addEventListener(
-    "visibilitychange",
+  button.addEventListener(
+    "click",
     function() {
 
-      if (
-        document.visibilityState ===
-        "visible"
-      ) {
+      cancelEditTransaction();
 
-        if (
-          !TradingState.isSaving
-        ) {
-
-          loadTradingData(
-            false
-          );
-
-        }
-
-      }
+      button.style.display = "none";
 
     }
+  );
+
+  saveButton.parentNode.insertBefore(
+    button,
+    saveButton
   );
 
 }
 
 
 /* =========================================================
-   BEFORE UNLOAD
+   UPDATE EDIT BUTTON STATE
 ========================================================= */
 
-window.addEventListener(
-  "beforeunload",
-  function() {
+function updateCancelEditButton() {
 
-    if (
-      TradingState.isSaving
-    ) {
+  const button =
+    el("cancelEditButton");
 
-      /*
-       * Browser akan menangani
-       * proses navigasi.
-       */
+  if (!button) {
+    return;
+  }
 
-      return;
+  button.style.display =
+    editingTransactionId
+      ? "block"
+      : "none";
 
-    }
+}
+
+
+/* =========================================================
+   WATCH EDIT STATE
+========================================================= */
+
+function setEditState() {
+
+  const original =
+    setTransactionEditMode;
+
+  /*
+   * Tidak mengganti fungsi asli.
+   * State tombol diperbarui setelah interval kecil.
+   */
+
+  setInterval(
+    updateCancelEditButton,
+    300
+  );
+
+}
+
+
+/* =========================================================
+   REFRESH DATA
+========================================================= */
+
+async function refreshTradingData() {
+
+  try {
+
+    showLoading(
+      "Memuat data terbaru..."
+    );
+
+    await loadTransactions();
+
+  } catch (error) {
+
+    console.error(
+      "[Trading] refresh:",
+      error
+    );
+
+  } finally {
+
+    hideLoading();
 
   }
-);
 
-
-/* =========================================================
-   GLOBAL TRADING OBJECT
-========================================================= */
-
-window.TradingJournal = {
-
-  state:
-    TradingState,
-
-  load:
-    loadTradingData,
-
-  refresh:
-    refreshTradingData,
-
-  render:
-    renderTransactions,
-
-  renderSummary:
-    renderSummary,
-
-  edit:
-    editTransaction,
-
-  update:
-    updateTransaction,
-
-  delete:
-    deleteTransaction,
-
-  reset:
-    resetTransactionForm,
-
-  openModal:
-    openModal,
-
-  closeModal:
-    closeModal
-
-};
-
-
-/* =========================================================
-   GLOBAL SHORTCUT
-========================================================= */
-
-window.refreshTrading =
-  refreshTradingData;
+}
 
 
 /* =========================================================
    INITIALIZE
 ========================================================= */
 
-async function initTradingPage() {
+async function initTrading() {
 
   console.log(
-    "========================================"
+    "[Trading] Initializing..."
   );
 
-  console.log(
-    "[Trading] Trading Journal starting..."
-  );
+  try {
 
-  console.log(
-    "[Trading] API available:",
-    typeof window.TradingAPI !== "undefined"
-  );
+    setupButtons();
 
-  console.log(
-    "========================================"
-  );
+    createCancelEditButton();
 
+    setDefaultDates();
 
-  /*
-   * Tanggal default.
-   */
+    updateNominalVisibility();
 
-  setToday(
-    "tanggal"
-  );
+    setEditState();
 
-  setToday(
-    "addModalTanggal"
-  );
+    await loadTransactions();
 
-  setToday(
-    "withdrawModalTanggal"
-  );
+    console.log(
+      "[Trading] Ready."
+    );
 
+  } catch (error) {
 
-  /*
-   * Event.
-   */
+    console.error(
+      "[Trading] INIT ERROR:",
+      error
+    );
 
-  bindProfitRugi();
+    showToast(
+      error.message ||
+      "Gagal menjalankan Trading Journal.",
+      "error"
+    );
 
-  bindModalEvents();
-
-  bindFormEvents();
-
-  bindVisibilityRefresh();
-
-
-  /*
-   * Load Google Sheets.
-   */
-
-  await loadTradingData(
-    true
-  );
-
-
-  /*
-   * Auto refresh.
-   */
-
-  startAutoRefresh();
-
-
-  console.log(
-    "[Trading] Initialization selesai."
-  );
+  }
 
 }
 
 
 /* =========================================================
-   DOM READY
+   GLOBAL FUNCTIONS
+========================================================= */
+
+window.TradingPage = {
+
+  init:
+    initTrading,
+
+  refresh:
+    refreshTradingData,
+
+  edit:
+    startEditTransaction,
+
+  delete:
+    handleDeleteTransaction,
+
+  addCapital:
+    openAddCapitalModal,
+
+  withdrawCapital:
+    openWithdrawCapitalModal,
+
+  closeModals:
+    closeAllModals,
+
+  toast:
+    showToast
+
+};
+
+
+/* =========================================================
+   START
 ========================================================= */
 
 if (
@@ -6859,13 +4796,20 @@ if (
 
   document.addEventListener(
     "DOMContentLoaded",
-    initTradingPage
+    initTrading
   );
 
-}
+} else {
 
-else {
-
-  initTradingPage();
+  initTrading();
 
 }
+
+
+console.log(
+  "[Trading] trading.js Stage 2 loaded."
+);
+
+console.log(
+  "[Trading] ADD + EDIT + DELETE + MODAL enabled."
+);
