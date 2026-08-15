@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <meta
+    name="theme-color"
+    content="#0b1120"
+  >
+
+  <title>Laporan Trading</title>
+
+  <link
+    rel="stylesheet"
+    href="css/style.css"
+  >
+</head>
+
+<body>
+
+  <!-- =========================
+       APP
+  ========================== -->
+
+  <div class="app">
+
+    <!-- =========================
+         HEADER
+    ========================== -->
+
+    <header class="topbar">
+
+      <div class="brand">
+
+        <div class="brand-icon">
+          TJ
+        </div>
+
+        <div>
+
+          <h1>
+            Trading Journal
+          </h1>
+
+          <p>
+            Laporan & performa trading
+          </p>
+
+        </div>
+
+      </div>
+
+
+      <nav class="navigation">
+
+        <a
+          href="index.html"
+          class="nav-link"
+        >
+          <span>↗</span>
+          Trading
+        </a>
+
+        <a
+          href="laporan.html"
+          class="nav-link active"
+        >
+          <span>▥</span>
+          Laporan
+        </a>
+
+      </nav>
+
+    </header>
+
+
+    <!-- =========================
+         MAIN
+    ========================== -->
+
+    <main class="main-content">
+
+
+      <!-- =========================
+           PAGE TITLE
+      ========================== -->
+
+      <section class="page-heading">
+
+        <div>
+
+          <div class="eyebrow">
+            PERFORMANCE
+          </div>
+
+          <h2>
+            Laporan Trading
+          </h2>
+
+          <p>
+            Pantau perkembangan modal dan hasil trading kamu.
+          </p>
+
+        </div>
+
+
+        <button
+          type="button"
+          id="refreshReportButton"
+          class="refresh-button"
+        >
+
+          <span>
+            ↻
+          </span>
+
+          Refresh
+
+        </button>
+
+      </section>
+
+
+      <!-- =========================
+           SUMMARY
+      ========================== -->
+
+      <section class="report-summary-grid">
+
+
+        <!-- MODAL -->
+
+        <div class="report-card">
+
+          <div class="report-card-header">
+
+            <span>
+              Modal Saat Ini
+            </span>
+
+            <span class="report-card-icon blue">
+              Rp
+            </span>
+
+          </div>
+
+          <div
+            id="reportModal"
+            class="report-card-value"
+          >
+            Rp0
+          </div>
+
+          <div class="report-card-footer">
+            Modal awal + tambah − tarik
+          </div>
+
+        </div>
+
+
+        <!-- PROFIT -->
+
+        <div class="report-card">
+
+          <div class="report-card-header">
+
+            <span>
+              Total Profit
+            </span>
+
+            <span class="report-card-icon green">
+              ↗
+            </span>
+
+          </div>
+
+          <div
+            id="reportProfit"
+            class="report-card-value positive"
+          >
+            Rp0
+          </div>
+
+          <div class="report-card-footer">
+            Semua transaksi profit
+          </div>
+
+        </div>
+
+
+        <!-- RUGI -->
+
+        <div class="report-card">
+
+          <div class="report-card-header">
+
+            <span>
+              Total Rugi
+            </span>
+
+            <span class="report-card-icon red">
+              ↘
+            </span>
+
+          </div>
+
+          <div
+            id="reportLoss"
+            class="report-card-value negative"
+          >
+            Rp0
+          </div>
+
+          <div class="report-card-footer">
+            Semua transaksi rugi
+          </div>
+
+        </div>
+
+
+        <!-- NET -->
+
+        <div class="report-card highlight-card">
+
+          <div class="report-card-header">
+
+            <span>
+              Net Profit / Loss
+            </span>
+
+            <span class="report-card-icon purple">
+              Σ
+            </span>
+
+          </div>
+
+          <div
+            id="reportNet"
+            class="report-card-value"
+          >
+            Rp0
+          </div>
+
+          <div
+            id="reportNetDescription"
+            class="report-card-footer"
+          >
+            Hasil bersih trading
+          </div>
+
+        </div>
+
+      </section>
+
+
+      <!-- =========================
+           SECONDARY STATS
+      ========================== -->
+
+      <section class="stats-grid">
+
+
+        <div class="stat-card">
+
+          <div class="stat-icon">
+            #
+          </div>
+
+          <div>
+
+            <div class="stat-label">
+              Total Transaksi
+            </div>
+
+            <div
+              id="reportTransactions"
+              class="stat-value"
+            >
+              0
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <div class="stat-card">
+
+          <div class="stat-icon green-bg">
+            W
+          </div>
+
+          <div>
+
+            <div class="stat-label">
+              Profit
+            </div>
+
+            <div
+              id="reportWinCount"
+              class="stat-value"
+            >
+              0
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <div class="stat-card">
+
+          <div class="stat-icon red-bg">
+            L
+          </div>
+
+          <div>
+
+            <div class="stat-label">
+              Rugi
+            </div>
+
+            <div
+              id="reportLossCount"
+              class="stat-value"
+            >
+              0
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <div class="stat-card">
+
+          <div class="stat-icon purple-bg">
+            %
+          </div>
+
+          <div>
+
+            <div class="stat-label">
+              Win Rate
+            </div>
+
+            <div
+              id="reportWinRate"
+              class="stat-value"
+            >
+              0%
+            </div>
+
+          </div>
+
+        </div>
+
+      </section>
+
+
+      <!-- =========================
+           MODAL BREAKDOWN
+      ========================== -->
+
+      <section class="capital-breakdown">
+
+        <div class="capital-item">
+
+          <div class="capital-label">
+            Modal Awal
+          </div>
+
+          <div
+            id="reportInitialCapital"
+            class="capital-value"
+          >
+            Rp0
+          </div>
+
+        </div>
+
+
+        <div class="capital-separator">
+          +
+        </div>
+
+
+        <div class="capital-item">
+
+          <div class="capital-label">
+            Tambah Modal
+          </div>
+
+          <div
+            id="reportAddedCapital"
+            class="capital-value positive"
+          >
+            Rp0
+          </div>
+
+        </div>
+
+
+        <div class="capital-separator">
+          −
+        </div>
+
+
+        <div class="capital-item">
+
+          <div class="capital-label">
+            Tarik Modal
+          </div>
+
+          <div
+            id="reportWithdrawnCapital"
+            class="capital-value negative"
+          >
+            Rp0
+          </div>
+
+        </div>
+
+
+        <div class="capital-separator">
+          =
+        </div>
+
+
+        <div class="capital-item final-capital">
+
+          <div class="capital-label">
+            Modal Saat Ini
+          </div>
+
+          <div
+            id="reportCurrentCapital"
+            class="capital-value"
+          >
+            Rp0
+          </div>
+
+        </div>
+
+      </section>
+
+
+      <!-- =========================
+           CHART SECTION
+      ========================== -->
+
+      <section class="chart-grid">
+
+
+        <!-- PROFIT CHART -->
+
+        <div class="panel chart-panel large-chart">
+
+          <div class="panel-header">
+
+            <div>
+
+              <div class="panel-title">
+                Perkembangan Profit / Loss
+              </div>
+
+              <div class="panel-subtitle">
+                Pergerakan hasil trading berdasarkan transaksi
+              </div>
+
+            </div>
+
+            <div class="chart-legend">
+
+              <span class="legend-dot profit-dot"></span>
+
+              Profit / Loss
+
+            </div>
+
+          </div>
+
+
+          <div class="chart-container">
+
+            <canvas
+              id="profitChart"
+            ></canvas>
+
+            <div
+              id="profitChartEmpty"
+              class="chart-empty hidden"
+            >
+              Belum ada data profit/loss.
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <!-- RESULT CHART -->
+
+        <div class="panel chart-panel">
+
+          <div class="panel-header">
+
+            <div>
+
+              <div class="panel-title">
+                Profit vs Rugi
+              </div>
+
+              <div class="panel-subtitle">
+                Perbandingan hasil trading
+              </div>
+
+            </div>
+
+          </div>
+
+
+          <div class="donut-chart-container">
+
+            <canvas
+              id="resultChart"
+            ></canvas>
+
+            <div
+              id="resultChartEmpty"
+              class="chart-empty hidden"
+            >
+              Belum ada data.
+            </div>
+
+          </div>
+
+
+          <div class="result-legend">
+
+            <div class="result-legend-item">
+
+              <span class="legend-dot green-dot"></span>
+
+              <span>
+                Profit
+              </span>
+
+              <strong id="chartProfitValue">
+                Rp0
+              </strong>
+
+            </div>
+
+
+            <div class="result-legend-item">
+
+              <span class="legend-dot red-dot"></span>
+
+              <span>
+                Rugi
+              </span>
+
+              <strong id="chartLossValue">
+                Rp0
+              </strong>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </section>
+
+
+      <!-- =========================
+           STOCK PERFORMANCE
+      ========================== -->
+
+      <section class="panel stock-panel">
+
+        <div class="panel-header">
+
+          <div>
+
+            <div class="panel-title">
+              Performa Saham
+            </div>
+
+            <div class="panel-subtitle">
+              Rekap profit dan rugi berdasarkan saham
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <div
+          id="stockEmpty"
+          class="empty-state hidden"
+        >
+
+          <div class="empty-icon">
+            ◫
+          </div>
+
+          <h3>
+            Belum ada data saham
+          </h3>
+
+          <p>
+            Rekap saham akan muncul setelah ada transaksi.
+          </p>
+
+        </div>
+
+
+        <div
+          id="stockTableWrapper"
+          class="table-wrapper hidden"
+        >
+
+          <table class="stock-table">
+
+            <thead>
+
+              <tr>
+
+                <th>
+                  Saham
+                </th>
+
+                <th>
+                  Transaksi
+                </th>
+
+                <th>
+                  Profit
+                </th>
+
+                <th>
+                  Rugi
+                </th>
+
+                <th>
+                  Net
+                </th>
+
+              </tr>
+
+            </thead>
+
+            <tbody
+              id="stockTableBody"
+            >
+            </tbody>
+
+          </table>
+
+        </div>
+
+      </section>
+
+
+      <!-- =========================
+           ALL TRANSACTIONS
+      ========================== -->
+
+      <section class="panel all-transactions-panel">
+
+        <div class="panel-header">
+
+          <div>
+
+            <div class="panel-title">
+              Semua Transaksi
+            </div>
+
+            <div class="panel-subtitle">
+              Riwayat lengkap aktivitas trading
+            </div>
+
+          </div>
+
+          <div
+            id="transactionCountLabel"
+            class="panel-badge"
+          >
+            0 TRANSAKSI
+          </div>
+
+        </div>
+
+
+        <!-- LOADING -->
+
+        <div
+          id="reportLoading"
+          class="loading-state"
+        >
+
+          <div class="spinner"></div>
+
+          <span>
+            Memuat laporan...
+          </span>
+
+        </div>
+
+
+        <!-- EMPTY -->
+
+        <div
+          id="reportEmpty"
+          class="empty-state hidden"
+        >
+
+          <div class="empty-icon">
+            ◫
+          </div>
+
+          <h3>
+            Belum ada transaksi
+          </h3>
+
+          <p>
+            Mulai catat transaksi dari halaman Trading.
+          </p>
+
+          <a
+            href="index.html"
+            class="primary-button small-button"
+          >
+            Tambah Transaksi
+          </a>
+
+        </div>
+
+
+        <!-- TABLE -->
+
+        <div
+          id="allTransactionsWrapper"
+          class="table-wrapper hidden"
+        >
+
+          <table class="transaction-table report-table">
+
+            <thead>
+
+              <tr>
+
+                <th>
+                  Tanggal
+                </th>
+
+                <th>
+                  Saham
+                </th>
+
+                <th>
+                  Aksi
+                </th>
+
+                <th>
+                  Harga
+                </th>
+
+                <th>
+                  Lot
+                </th>
+
+                <th>
+                  Hasil
+                </th>
+
+                <th>
+                  Nominal
+                </th>
+
+                <th>
+                  Catatan
+                </th>
+
+              </tr>
+
+            </thead>
+
+            <tbody
+              id="allTransactionsBody"
+            >
+            </tbody>
+
+          </table>
+
+        </div>
+
+      </section>
+
+    </main>
+
+
+    <!-- =========================
+         FOOTER
+    ========================== -->
+
+    <footer class="footer">
+
+      <span>
+        Trading Journal
+      </span>
+
+      <span>
+        Data tersimpan di Google Sheets
+      </span>
+
+    </footer>
+
+  </div>
+
+
+  <!-- =========================
+       TOAST
+  ========================== -->
+
+  <div
+    id="toast"
+    class="toast hidden"
+  >
+
+    <div
+      id="toastIcon"
+      class="toast-icon"
+    >
+      ✓
+    </div>
+
+    <div>
+
+      <div
+        id="toastTitle"
+        class="toast-title"
+      >
+        Berhasil
+      </div>
+
+      <div
+        id="toastMessage"
+        class="toast-message"
+      >
+        Data berhasil diperbarui.
+      </div>
+
+    </div>
+
+  </div>
+
+
+  <!-- =========================
+       GLOBAL LOADING
+  ========================== -->
+
+  <div
+    id="globalLoading"
+    class="global-loading hidden"
+  >
+
+    <div class="global-loading-box">
+
+      <div class="spinner"></div>
+
+      <span id="globalLoadingText">
+        Memuat...
+      </span>
+
+    </div>
+
+  </div>
+
+
+  <!-- =========================
+       CHART.JS
+  ========================== -->
+
+  <script
+    src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"
+  ></script>
+
+
+  <!-- =========================
+       JAVASCRIPT
+  ========================== -->
+
+  <script src="js/api.js"></script>
+  <script src="js/laporan.js"></script>
+
+</body>
+</html>
