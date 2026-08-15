@@ -1,8 +1,36 @@
 /* =========================================================
    TRADING JOURNAL
    api.js
-   VERSION: STAGE 2
-   JSON REQUEST + EDIT + DELETE
+   VERSION: FINAL
+   GOOGLE APPS SCRIPT + GOOGLE SHEETS
+
+   SHEET TRANSAKSI:
+   ID
+   Tanggal
+   Saham
+   Aksi
+   Harga
+   Lot
+   Profit/Rugi
+   Nominal
+   Catatan
+
+   SHEET MODAL:
+   ID
+   Tanggal
+   Jenis
+   Nominal
+   Catatan
+
+   FITUR:
+   - GET ALL DATA
+   - ADD TRANSACTION
+   - UPDATE TRANSACTION
+   - DELETE TRANSACTION
+   - ADD CAPITAL
+   - WITHDRAW CAPITAL
+   - GET CAPITAL
+   - GET REPORT
 ========================================================= */
 
 "use strict";
@@ -22,10 +50,74 @@ const API_URL =
 
 const API_CONFIG = {
 
-  timeout: 30000,
+  timeout:
+    30000,
+
+  /*
+   * Body tetap JSON.
+   *
+   * Content-Type text/plain digunakan
+   * agar lebih aman terhadap CORS Apps Script.
+   */
 
   contentType:
     "text/plain;charset=UTF-8"
+
+};
+
+
+/* =========================================================
+   SHEET FIELD
+========================================================= */
+
+const TRANSACTION_FIELDS = {
+
+  id:
+    "ID",
+
+  tanggal:
+    "Tanggal",
+
+  saham:
+    "Saham",
+
+  aksi:
+    "Aksi",
+
+  harga:
+    "Harga",
+
+  lot:
+    "Lot",
+
+  profitRugi:
+    "Profit/Rugi",
+
+  nominal:
+    "Nominal",
+
+  catatan:
+    "Catatan"
+
+};
+
+
+const MODAL_FIELDS = {
+
+  id:
+    "ID",
+
+  tanggal:
+    "Tanggal",
+
+  jenis:
+    "Jenis",
+
+  nominal:
+    "Nominal",
+
+  catatan:
+    "Catatan"
 
 };
 
@@ -49,7 +141,9 @@ function validateApiUrl() {
 
 
   if (
-    API_URL.includes("GANTI_DENGAN")
+    API_URL.includes(
+      "GANTI_DENGAN"
+    )
   ) {
 
     throw new Error(
@@ -62,7 +156,7 @@ function validateApiUrl() {
 
 
 /* =========================================================
-   API REQUEST
+   REQUEST API
 ========================================================= */
 
 async function apiRequest(
@@ -99,6 +193,12 @@ async function apiRequest(
 
   try {
 
+    /*
+     * ==========================================
+     * PAYLOAD
+     * ==========================================
+     */
+
     const payload = {
 
       action:
@@ -110,14 +210,31 @@ async function apiRequest(
 
 
     const body =
-      JSON.stringify(payload);
+      JSON.stringify(
+        payload
+      );
 
 
     console.log(
-      "[TradingAPI] POST:",
+      "[TradingAPI] POST",
+    );
+
+    console.log(
+      "Action:",
+      action
+    );
+
+    console.log(
+      "Payload:",
       payload
     );
 
+
+    /*
+     * ==========================================
+     * FETCH
+     * ==========================================
+     */
 
     const response =
       await fetch(
@@ -144,6 +261,12 @@ async function apiRequest(
       );
 
 
+    /*
+     * ==========================================
+     * HTTP STATUS
+     * ==========================================
+     */
+
     if (!response.ok) {
 
       throw new Error(
@@ -155,6 +278,12 @@ async function apiRequest(
 
     }
 
+
+    /*
+     * ==========================================
+     * RESPONSE
+     * ==========================================
+     */
 
     const text =
       await response.text();
@@ -178,18 +307,29 @@ async function apiRequest(
     }
 
 
+    /*
+     * ==========================================
+     * PARSE JSON
+     * ==========================================
+     */
+
     let result;
 
 
     try {
 
       result =
-        JSON.parse(text);
+        JSON.parse(
+          text
+        );
 
-    } catch (parseError) {
+    } catch (error) {
 
       console.error(
-        "[TradingAPI] JSON PARSE ERROR:",
+        "[TradingAPI] JSON PARSE ERROR"
+      );
+
+      console.error(
         text
       );
 
@@ -200,6 +340,12 @@ async function apiRequest(
 
     }
 
+
+    /*
+     * ==========================================
+     * BACKEND ERROR
+     * ==========================================
+     */
 
     if (
       result &&
@@ -214,10 +360,20 @@ async function apiRequest(
     }
 
 
+    /*
+     * ==========================================
+     * SUCCESS
+     * ==========================================
+     */
+
     return result;
 
 
   } catch (error) {
+
+    /*
+     * TIMEOUT
+     */
 
     if (
       error &&
@@ -227,11 +383,16 @@ async function apiRequest(
       throw new Error(
         "Request timeout setelah " +
         API_CONFIG.timeout +
-        " ms."
+        " ms. " +
+        "Periksa koneksi dan deployment Apps Script."
       );
 
     }
 
+
+    /*
+     * NETWORK / CORS
+     */
 
     if (
       error &&
@@ -246,7 +407,8 @@ async function apiRequest(
 
       throw new Error(
         "Tidak dapat terhubung ke Google Apps Script. " +
-        "Periksa URL Web App, deployment Apps Script, akses Web App, dan koneksi internet."
+        "Periksa URL Web App, deployment Apps Script, " +
+        "akses Web App, dan koneksi internet."
       );
 
     }
@@ -328,6 +490,12 @@ async function getAllData() {
       await response.text();
 
 
+    console.log(
+      "[TradingAPI] GET RESPONSE:",
+      text
+    );
+
+
     if (
       !text ||
       !text.trim()
@@ -346,7 +514,9 @@ async function getAllData() {
     try {
 
       result =
-        JSON.parse(text);
+        JSON.parse(
+          text
+        );
 
     } catch (error) {
 
@@ -420,6 +590,29 @@ async function getAllData() {
 
 
 /* =========================================================
+   EXTRACT DATA
+========================================================= */
+
+function extractData(
+  result
+) {
+
+  if (
+    result &&
+    result.data
+  ) {
+
+    return result.data;
+
+  }
+
+
+  return result || {};
+
+}
+
+
+/* =========================================================
    GET TRANSACTIONS
 ========================================================= */
 
@@ -430,13 +623,14 @@ async function getTransactions() {
 
 
   const data =
-    result?.data ||
-    result;
+    extractData(
+      result
+    );
 
 
   if (
     Array.isArray(
-      data?.transaksi
+      data.transaksi
     )
   ) {
 
@@ -447,7 +641,7 @@ async function getTransactions() {
 
   if (
     Array.isArray(
-      data?.transactions
+      data.transactions
     )
   ) {
 
@@ -462,7 +656,39 @@ async function getTransactions() {
 
 
 /* =========================================================
-   GET CAPITAL
+   GET MODAL DATA
+========================================================= */
+
+async function getModalData() {
+
+  const result =
+    await getAllData();
+
+
+  const data =
+    extractData(
+      result
+    );
+
+
+  if (
+    Array.isArray(
+      data.modal
+    )
+  ) {
+
+    return data.modal;
+
+  }
+
+
+  return [];
+
+}
+
+
+/* =========================================================
+   GET CAPITAL / SUMMARY
 ========================================================= */
 
 async function getCapital() {
@@ -472,12 +698,13 @@ async function getCapital() {
 
 
   const data =
-    result?.data ||
-    result;
+    extractData(
+      result
+    );
 
 
   if (
-    data?.summary
+    data.summary
   ) {
 
     return data.summary;
@@ -486,7 +713,7 @@ async function getCapital() {
 
 
   if (
-    result?.capital
+    result.capital
   ) {
 
     return result.capital;
@@ -510,12 +737,13 @@ async function getReport() {
 
 
   const data =
-    result?.data ||
-    result;
+    extractData(
+      result
+    );
 
 
   if (
-    data?.summary
+    data.summary
   ) {
 
     return data.summary;
@@ -524,7 +752,7 @@ async function getReport() {
 
 
   if (
-    result?.report
+    result.report
   ) {
 
     return result.report;
@@ -557,47 +785,74 @@ function normalizeTransactionData(
   }
 
 
+  /*
+   * TANGGAL
+   */
+
   const tanggal =
     String(
-      transaction.tanggal ||
-      transaction.Tanggal ||
+      transaction.tanggal ??
+      transaction.Tanggal ??
       ""
-    ).trim();
+    )
+    .trim();
 
+
+  /*
+   * SAHAM
+   */
 
   const saham =
     String(
-      transaction.saham ||
-      transaction.Saham ||
+      transaction.saham ??
+      transaction.Saham ??
       ""
     )
     .trim()
     .toUpperCase();
 
+
+  /*
+   * AKSI
+   */
 
   const aksi =
     String(
-      transaction.aksi ||
-      transaction.Aksi ||
+      transaction.aksi ??
+      transaction.Aksi ??
       ""
     )
     .trim()
     .toUpperCase();
 
+
+  /*
+   * HARGA
+   */
 
   const harga =
     Number(
       transaction.harga ??
-      transaction.Harga
-    ) || 0;
+      transaction.Harga ??
+      0
+    );
 
+
+  /*
+   * LOT
+   */
 
   const lot =
     Number(
       transaction.lot ??
-      transaction.Lot
-    ) || 0;
+      transaction.Lot ??
+      0
+    );
 
+
+  /*
+   * PROFIT / RUGI
+   */
 
   let profitRugi =
     transaction.profitRugi;
@@ -610,37 +865,74 @@ function normalizeTransactionData(
   ) {
 
     profitRugi =
-      transaction.hasil ??
-      transaction["Profit/Rugi"] ??
-      "";
+      transaction.hasil;
+
+  }
+
+
+  if (
+    profitRugi === undefined ||
+    profitRugi === null ||
+    profitRugi === ""
+  ) {
+
+    profitRugi =
+      transaction["Profit/Rugi"];
 
   }
 
 
   profitRugi =
     String(
-      profitRugi
+      profitRugi ??
+      ""
     )
     .trim()
     .toUpperCase();
 
 
+  /*
+   * NOMINAL
+   */
+
   const nominal =
     Number(
       transaction.nominal ??
-      transaction.Nominal
-    ) || 0;
+      transaction.Nominal ??
+      0
+    );
 
+
+  /*
+   * CATATAN
+   */
 
   const catatan =
     String(
       transaction.catatan ??
       transaction.Catatan ??
       ""
-    ).trim();
+    )
+    .trim();
+
+
+  /*
+   * ID
+   *
+   * ID tidak ikut dikirim sebagai
+   * data transaksi saat ADD.
+   */
+
+  const id =
+    transaction.id ??
+    transaction.ID ??
+    "";
 
 
   return {
+
+    id:
+      id,
 
     tanggal:
       tanggal,
@@ -679,7 +971,13 @@ function validateTransactionData(
   transaction
 ) {
 
-  if (!transaction.tanggal) {
+  /*
+   * TANGGAL
+   */
+
+  if (
+    !transaction.tanggal
+  ) {
 
     throw new Error(
       "Tanggal transaksi wajib diisi."
@@ -688,7 +986,13 @@ function validateTransactionData(
   }
 
 
-  if (!transaction.saham) {
+  /*
+   * SAHAM
+   */
+
+  if (
+    !transaction.saham
+  ) {
 
     throw new Error(
       "Kode saham wajib diisi."
@@ -696,6 +1000,10 @@ function validateTransactionData(
 
   }
 
+
+  /*
+   * AKSI
+   */
 
   if (
     transaction.aksi !== "BUY" &&
@@ -709,8 +1017,14 @@ function validateTransactionData(
   }
 
 
+  /*
+   * HARGA
+   */
+
   if (
-    !Number.isFinite(transaction.harga) ||
+    !Number.isFinite(
+      transaction.harga
+    ) ||
     transaction.harga <= 0
   ) {
 
@@ -721,8 +1035,14 @@ function validateTransactionData(
   }
 
 
+  /*
+   * LOT
+   */
+
   if (
-    !Number.isFinite(transaction.lot) ||
+    !Number.isFinite(
+      transaction.lot
+    ) ||
     transaction.lot <= 0
   ) {
 
@@ -733,6 +1053,10 @@ function validateTransactionData(
   }
 
 
+  /*
+   * PROFIT / RUGI
+   */
+
   if (
     transaction.profitRugi !== "" &&
     transaction.profitRugi !== "PROFIT" &&
@@ -740,16 +1064,22 @@ function validateTransactionData(
   ) {
 
     throw new Error(
-      "Hasil harus PROFIT atau RUGI."
+      "Profit/Rugi harus PROFIT atau RUGI."
     );
 
   }
 
 
+  /*
+   * NOMINAL
+   */
+
   if (
     transaction.profitRugi !== "" &&
     (
-      !Number.isFinite(transaction.nominal) ||
+      !Number.isFinite(
+        transaction.nominal
+      ) ||
       transaction.nominal <= 0
     )
   ) {
@@ -759,6 +1089,24 @@ function validateTransactionData(
     );
 
   }
+
+
+  /*
+   * Jika tidak ada profit/rugi,
+   * nominal dipaksa 0.
+   */
+
+  if (
+    transaction.profitRugi === ""
+  ) {
+
+    transaction.nominal =
+      0;
+
+  }
+
+
+  return true;
 
 }
 
@@ -782,6 +1130,15 @@ async function addTransaction(
   );
 
 
+  /*
+   * ID tidak perlu dikirim.
+   *
+   * Google Apps Script yang membuat ID.
+   */
+
+  delete normalized.id;
+
+
   return await apiRequest(
     "transaction",
     normalized
@@ -799,10 +1156,14 @@ async function updateTransaction(
   transaction
 ) {
 
+  /*
+   * VALIDASI ID
+   */
+
   if (
     id === undefined ||
     id === null ||
-    id === ""
+    String(id).trim() === ""
   ) {
 
     throw new Error(
@@ -823,16 +1184,51 @@ async function updateTransaction(
   );
 
 
+  /*
+   * ID harus dikirim ke backend.
+   */
+
+  const payload = {
+
+    id:
+      String(id).trim(),
+
+    tanggal:
+      normalized.tanggal,
+
+    saham:
+      normalized.saham,
+
+    aksi:
+      normalized.aksi,
+
+    harga:
+      normalized.harga,
+
+    lot:
+      normalized.lot,
+
+    profitRugi:
+      normalized.profitRugi,
+
+    nominal:
+      normalized.nominal,
+
+    catatan:
+      normalized.catatan
+
+  };
+
+
+  console.log(
+    "[TradingAPI] UPDATE TRANSACTION:",
+    payload
+  );
+
+
   return await apiRequest(
     "update_transaction",
-    {
-
-      id:
-        id,
-
-      ...normalized
-
-    }
+    payload
   );
 
 }
@@ -849,7 +1245,7 @@ async function deleteTransaction(
   if (
     id === undefined ||
     id === null ||
-    id === ""
+    String(id).trim() === ""
   ) {
 
     throw new Error(
@@ -859,14 +1255,23 @@ async function deleteTransaction(
   }
 
 
+  const payload = {
+
+    id:
+      String(id).trim()
+
+  };
+
+
+  console.log(
+    "[TradingAPI] DELETE TRANSACTION:",
+    payload
+  );
+
+
   return await apiRequest(
     "delete_transaction",
-    {
-
-      id:
-        id
-
-    }
+    payload
   );
 
 }
@@ -883,11 +1288,15 @@ async function addCapital(
 ) {
 
   const nominal =
-    Number(amount);
+    Number(
+      amount
+    );
 
 
   if (
-    !Number.isFinite(nominal) ||
+    !Number.isFinite(
+      nominal
+    ) ||
     nominal <= 0
   ) {
 
@@ -898,23 +1307,32 @@ async function addCapital(
   }
 
 
+  const payload = {
+
+    tanggal:
+      tanggal ||
+      getTodayString(),
+
+    nominal:
+      nominal,
+
+    catatan:
+      String(
+        note || ""
+      ).trim()
+
+  };
+
+
+  console.log(
+    "[TradingAPI] ADD CAPITAL:",
+    payload
+  );
+
+
   return await apiRequest(
     "add_modal",
-    {
-
-      tanggal:
-        tanggal ||
-        getTodayString(),
-
-      nominal:
-        nominal,
-
-      catatan:
-        String(
-          note || ""
-        ).trim()
-
-    }
+    payload
   );
 
 }
@@ -931,11 +1349,15 @@ async function withdrawCapital(
 ) {
 
   const nominal =
-    Number(amount);
+    Number(
+      amount
+    );
 
 
   if (
-    !Number.isFinite(nominal) ||
+    !Number.isFinite(
+      nominal
+    ) ||
     nominal <= 0
   ) {
 
@@ -946,23 +1368,32 @@ async function withdrawCapital(
   }
 
 
+  const payload = {
+
+    tanggal:
+      tanggal ||
+      getTodayString(),
+
+    nominal:
+      nominal,
+
+    catatan:
+      String(
+        note || ""
+      ).trim()
+
+  };
+
+
+  console.log(
+    "[TradingAPI] WITHDRAW CAPITAL:",
+    payload
+  );
+
+
   return await apiRequest(
     "withdraw_modal",
-    {
-
-      tanggal:
-        tanggal ||
-        getTodayString(),
-
-      nominal:
-        nominal,
-
-      catatan:
-        String(
-          note || ""
-        ).trim()
-
-    }
+    payload
   );
 
 }
@@ -1000,7 +1431,7 @@ async function apiGet(
 
 
 /* =========================================================
-   TODAY
+   TODAY STRING
 ========================================================= */
 
 function getTodayString() {
@@ -1009,43 +1440,90 @@ function getTodayString() {
     new Date();
 
 
-  return (
-    now.getFullYear() +
-    "-" +
+  const year =
+    now.getFullYear();
+
+
+  const month =
     String(
       now.getMonth() + 1
-    ).padStart(2, "0") +
-    "-" +
+    )
+    .padStart(
+      2,
+      "0"
+    );
+
+
+  const day =
     String(
       now.getDate()
-    ).padStart(2, "0")
+    )
+    .padStart(
+      2,
+      "0"
+    );
+
+
+  return (
+    year +
+    "-" +
+    month +
+    "-" +
+    day
   );
 
 }
 
 
 /* =========================================================
-   TEST
+   TEST API
 ========================================================= */
 
 async function testApiConnection() {
 
   try {
 
-    await getAllData();
+    const result =
+      await getAllData();
+
 
     console.log(
-      "[TradingAPI] Connection OK"
+      "========================================"
     );
+
+    console.log(
+      "[TradingAPI] CONNECTION OK"
+    );
+
+    console.log(
+      result
+    );
+
+    console.log(
+      "========================================"
+    );
+
 
     return true;
 
   } catch (error) {
 
     console.error(
-      "[TradingAPI] Connection FAILED:",
+      "========================================"
+    );
+
+    console.error(
+      "[TradingAPI] CONNECTION FAILED"
+    );
+
+    console.error(
       error
     );
+
+    console.error(
+      "========================================"
+    );
+
 
     return false;
 
@@ -1055,7 +1533,7 @@ async function testApiConnection() {
 
 
 /* =========================================================
-   CHECK
+   CHECK API
 ========================================================= */
 
 async function checkApiConnection() {
@@ -1075,8 +1553,9 @@ async function checkApiConnection() {
         "Google Apps Script terhubung.",
 
       data:
-        result?.data ||
-        {}
+        extractData(
+          result
+        )
 
     };
 
@@ -1088,7 +1567,12 @@ async function checkApiConnection() {
         false,
 
       message:
-        getApiErrorMessage(error)
+        getApiErrorMessage(
+          error
+        ),
+
+      data:
+        null
 
     };
 
@@ -1098,7 +1582,7 @@ async function checkApiConnection() {
 
 
 /* =========================================================
-   ERROR
+   ERROR MESSAGE
 ========================================================= */
 
 function getApiErrorMessage(
@@ -1130,13 +1614,15 @@ function getApiErrorMessage(
   }
 
 
-  return String(error);
+  return String(
+    error
+  );
 
 }
 
 
 /* =========================================================
-   DEBUG
+   DEBUG API
 ========================================================= */
 
 function debugApi() {
@@ -1146,7 +1632,11 @@ function debugApi() {
   );
 
   console.log(
-    "TRADING JOURNAL API - STAGE 2"
+    "TRADING JOURNAL API"
+  );
+
+  console.log(
+    "========================================"
   );
 
   console.log(
@@ -1165,6 +1655,16 @@ function debugApi() {
   );
 
   console.log(
+    "TRANSAKSI FIELDS:",
+    TRANSACTION_FIELDS
+  );
+
+  console.log(
+    "MODAL FIELDS:",
+    MODAL_FIELDS
+  );
+
+  console.log(
     "========================================"
   );
 
@@ -1172,10 +1672,14 @@ function debugApi() {
 
 
 /* =========================================================
-   GLOBAL API
+   GLOBAL API OBJECT
 ========================================================= */
 
 window.TradingAPI = {
+
+  /*
+   * CORE
+   */
 
   request:
     apiRequest,
@@ -1187,11 +1691,18 @@ window.TradingAPI = {
     apiGet,
 
 
+  /*
+   * DATA
+   */
+
   getAllData:
     getAllData,
 
   getTransactions:
     getTransactions,
+
+  getModalData:
+    getModalData,
 
   getCapital:
     getCapital,
@@ -1199,6 +1710,10 @@ window.TradingAPI = {
   getReport:
     getReport,
 
+
+  /*
+   * TRANSAKSI
+   */
 
   addTransaction:
     addTransaction,
@@ -1210,12 +1725,20 @@ window.TradingAPI = {
     deleteTransaction,
 
 
+  /*
+   * MODAL
+   */
+
   addCapital:
     addCapital,
 
   withdrawCapital:
     withdrawCapital,
 
+
+  /*
+   * TEST
+   */
 
   test:
     testApiConnection,
@@ -1226,6 +1749,11 @@ window.TradingAPI = {
   debug:
     debugApi,
 
+
+  /*
+   * ERROR
+   */
+
   errorMessage:
     getApiErrorMessage
 
@@ -1233,7 +1761,7 @@ window.TradingAPI = {
 
 
 /* =========================================================
-   GLOBAL SHORTCUTS
+   GLOBAL SHORTCUT
 ========================================================= */
 
 window.testTradingAPI =
@@ -1244,10 +1772,46 @@ window.debugTradingAPI =
   debugApi;
 
 
+/* =========================================================
+   INITIAL LOG
+========================================================= */
+
 console.log(
-  "[TradingAPI] Stage 2 loaded."
+  "========================================"
 );
 
 console.log(
-  "[TradingAPI] Edit/Delete ENABLED."
+  "[TradingAPI] FINAL VERSION LOADED"
+);
+
+console.log(
+  "[TradingAPI] JSON REQUEST: ENABLED"
+);
+
+console.log(
+  "[TradingAPI] ADD: ENABLED"
+);
+
+console.log(
+  "[TradingAPI] EDIT: ENABLED"
+);
+
+console.log(
+  "[TradingAPI] DELETE: ENABLED"
+);
+
+console.log(
+  "[TradingAPI] MODAL: ENABLED"
+);
+
+console.log(
+  "[TradingAPI] TRANSAKSI SHEET: 9 COLUMNS"
+);
+
+console.log(
+  "[TradingAPI] MODAL SHEET: 5 COLUMNS"
+);
+
+console.log(
+  "========================================"
 );
