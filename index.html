@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
+
   <meta charset="UTF-8">
 
   <meta
@@ -19,807 +21,1079 @@
     rel="stylesheet"
     href="css/style.css"
   >
+
 </head>
+
 
 <body>
 
-  <!-- =========================
-       APP
-  ========================== -->
+<div class="app">
 
-  <div class="app">
 
-    <!-- =========================
-         HEADER
-    ========================== -->
+  <!-- =====================================================
+       HEADER
+  ====================================================== -->
 
-    <header class="topbar">
+  <header class="topbar">
 
-      <div class="brand">
+    <div class="brand">
 
-        <div class="brand-icon">
-          TJ
+      <div class="brand-icon">
+        TJ
+      </div>
+
+      <div>
+
+        <h1>
+          Trading Journal
+        </h1>
+
+        <p>
+          Catatan trading pribadi
+        </p>
+
+      </div>
+
+    </div>
+
+
+    <nav class="navigation">
+
+      <a
+        href="index.html"
+        class="nav-link active"
+      >
+        <span>↗</span>
+        Trading
+      </a>
+
+      <a
+        href="laporan.html"
+        class="nav-link"
+      >
+        <span>▥</span>
+        Laporan
+      </a>
+
+    </nav>
+
+  </header>
+
+
+
+  <!-- =====================================================
+       MAIN
+  ====================================================== -->
+
+  <main class="main-content">
+
+
+    <!-- =================================================
+         SUMMARY
+    ================================================== -->
+
+    <section class="summary-grid">
+
+
+      <!-- MODAL -->
+
+      <div class="summary-card modal-card">
+
+        <div class="summary-top">
+
+          <div class="summary-label">
+            Modal
+          </div>
+
+          <div class="summary-icon">
+            Rp
+          </div>
+
         </div>
 
-        <div>
-          <h1>Trading Journal</h1>
-          <p>Catatan trading pribadi</p>
+
+        <div
+          id="modalValue"
+          class="summary-value"
+        >
+          Rp0
+        </div>
+
+
+        <div class="summary-description">
+          Modal tersedia
         </div>
 
       </div>
 
 
-      <nav class="navigation">
 
-        <a
-          href="index.html"
-          class="nav-link active"
-        >
-          <span>↗</span>
-          Trading
-        </a>
+      <!-- PROFIT LOSS -->
 
-        <a
-          href="laporan.html"
-          class="nav-link"
-        >
-          <span>▥</span>
-          Laporan
-        </a>
+      <div class="summary-card profit-card">
 
-      </nav>
+        <div class="summary-top">
 
-    </header>
-
-
-    <!-- =========================
-         MAIN
-    ========================== -->
-
-    <main class="main-content">
-
-
-      <!-- =========================
-           SUMMARY
-      ========================== -->
-
-      <section class="summary-grid">
-
-
-        <!-- MODAL -->
-
-        <div class="summary-card modal-card">
-
-          <div class="summary-top">
-
-            <div class="summary-label">
-              Modal
-            </div>
-
-            <div class="summary-icon">
-              Rp
-            </div>
-
+          <div class="summary-label">
+            Profit / Loss
           </div>
 
           <div
-            id="modalValue"
-            class="summary-value"
+            id="profitIcon"
+            class="summary-icon profit-icon"
           >
-            Rp0
-          </div>
-
-          <div class="summary-description">
-            Modal tersedia
+            ↗
           </div>
 
         </div>
 
 
-        <!-- PROFIT LOSS -->
+        <div
+          id="profitLossValue"
+          class="summary-value"
+        >
+          Rp0
+        </div>
 
-        <div class="summary-card profit-card">
 
-          <div class="summary-top">
+        <div
+          id="profitLossDescription"
+          class="summary-description"
+        >
+          Net hasil trading
+        </div>
 
-            <div class="summary-label">
-              Profit / Loss
+      </div>
+
+
+
+      <!-- TOTAL -->
+
+      <div class="summary-card total-card">
+
+        <div class="summary-top">
+
+          <div class="summary-label">
+            Total
+          </div>
+
+          <div class="summary-icon">
+            Σ
+          </div>
+
+        </div>
+
+
+        <div
+          id="totalValue"
+          class="summary-value"
+        >
+          Rp0
+        </div>
+
+
+        <div class="summary-description">
+          Modal + hasil trading
+        </div>
+
+      </div>
+
+    </section>
+
+
+
+    <!-- =================================================
+         MODAL ACTION
+    ================================================== -->
+
+    <section class="modal-actions">
+
+      <button
+        type="button"
+        id="addModalButton"
+        class="action-button add-modal-button"
+      >
+
+        <span class="button-icon">
+          +
+        </span>
+
+        <span>
+          Tambah Modal
+        </span>
+
+      </button>
+
+
+      <button
+        type="button"
+        id="withdrawModalButton"
+        class="action-button withdraw-modal-button"
+      >
+
+        <span class="button-icon">
+          −
+        </span>
+
+        <span>
+          Tarik Modal
+        </span>
+
+      </button>
+
+    </section>
+
+
+
+    <!-- =================================================
+         CONTENT GRID
+    ================================================== -->
+
+    <section class="content-grid">
+
+
+      <!-- =================================================
+           TRANSACTION FORM
+      ================================================== -->
+
+      <div class="panel transaction-panel">
+
+        <div class="panel-header">
+
+          <div>
+
+            <div class="panel-title">
+              Tambah Transaksi
             </div>
 
-            <div
-              id="profitIcon"
-              class="summary-icon profit-icon"
+            <div class="panel-subtitle">
+              Catat aktivitas trading kamu
+            </div>
+
+          </div>
+
+          <div class="panel-badge">
+            TRADING
+          </div>
+
+        </div>
+
+
+
+        <form
+          id="transactionForm"
+          class="transaction-form"
+        >
+
+
+          <!-- TANGGAL -->
+
+          <div class="form-group">
+
+            <label for="tanggal">
+              Tanggal
+            </label>
+
+            <input
+              type="date"
+              id="tanggal"
+              name="tanggal"
+              required
             >
-              ↗
-            </div>
 
           </div>
 
-          <div
-            id="profitLossValue"
-            class="summary-value"
-          >
-            Rp0
-          </div>
-
-          <div
-            id="profitLossDescription"
-            class="summary-description"
-          >
-            Net hasil trading
-          </div>
-
-        </div>
 
 
-        <!-- TOTAL -->
+          <!-- SAHAM -->
 
-        <div class="summary-card total-card">
+          <div class="form-group">
 
-          <div class="summary-top">
+            <label for="saham">
+              Saham
+            </label>
 
-            <div class="summary-label">
-              Total
-            </div>
-
-            <div class="summary-icon">
-              Σ
-            </div>
+            <input
+              type="text"
+              id="saham"
+              name="saham"
+              placeholder="Contoh: BBCA"
+              maxlength="20"
+              autocomplete="off"
+              required
+            >
 
           </div>
 
-          <div
-            id="totalValue"
-            class="summary-value"
-          >
-            Rp0
-          </div>
-
-          <div class="summary-description">
-            Modal + hasil trading
-          </div>
-
-        </div>
-
-      </section>
 
 
-      <!-- =========================
-           MODAL ACTION
-      ========================== -->
+          <!-- AKSI -->
 
-      <section class="modal-actions">
+          <div class="form-group">
 
-        <button
-          type="button"
-          id="addModalButton"
-          class="action-button add-modal-button"
-        >
+            <label for="aksi">
+              Aksi
+            </label>
 
-          <span class="button-icon">
-            +
-          </span>
+            <div class="select-wrapper">
 
-          <span>
-            Tambah Modal
-          </span>
+              <select
+                id="aksi"
+                name="aksi"
+                required
+              >
 
-        </button>
+                <option value="BUY">
+                  BUY
+                </option>
 
+                <option value="SELL">
+                  SELL
+                </option>
 
-        <button
-          type="button"
-          id="withdrawModalButton"
-          class="action-button withdraw-modal-button"
-        >
+              </select>
 
-          <span class="button-icon">
-            −
-          </span>
-
-          <span>
-            Tarik Modal
-          </span>
-
-        </button>
-
-      </section>
-
-
-      <!-- =========================
-           TRANSACTION SECTION
-      ========================== -->
-
-      <section class="content-grid">
-
-
-        <!-- =========================
-             FORM
-        ========================== -->
-
-        <div class="panel transaction-panel">
-
-          <div class="panel-header">
-
-            <div>
-
-              <div class="panel-title">
-                Tambah Transaksi
-              </div>
-
-              <div class="panel-subtitle">
-                Catat aktivitas trading kamu
-              </div>
-
-            </div>
-
-            <div class="panel-badge">
-              TRADING
             </div>
 
           </div>
 
 
-          <form
-            id="transactionForm"
-            class="transaction-form"
-          >
 
+          <!-- HARGA + LOT -->
 
-            <!-- TANGGAL -->
+          <div class="form-row">
+
 
             <div class="form-group">
 
-              <label for="tanggal">
-                Tanggal
+              <label for="harga">
+                Harga
               </label>
 
               <input
-                type="date"
-                id="tanggal"
-                name="tanggal"
+                type="number"
+                id="harga"
+                name="harga"
+                placeholder="8.200"
+                min="0"
+                step="1"
+                inputmode="numeric"
                 required
               >
 
             </div>
 
 
-            <!-- SAHAM -->
-
             <div class="form-group">
 
-              <label for="saham">
-                Saham
+              <label for="lot">
+                Lot
               </label>
 
               <input
-                type="text"
-                id="saham"
-                name="saham"
-                placeholder="Contoh: BBCA"
-                maxlength="20"
-                autocomplete="off"
+                type="number"
+                id="lot"
+                name="lot"
+                placeholder="10"
+                min="1"
+                step="1"
+                inputmode="numeric"
                 required
               >
 
             </div>
 
-
-            <!-- AKSI -->
-
-            <div class="form-group">
-
-              <label for="aksi">
-                Aksi
-              </label>
-
-              <div class="select-wrapper">
-
-                <select
-                  id="aksi"
-                  name="aksi"
-                  required
-                >
-
-                  <option value="BUY">
-                    BUY
-                  </option>
-
-                  <option value="SELL">
-                    SELL
-                  </option>
-
-                </select>
-
-              </div>
-
-            </div>
+          </div>
 
 
-            <!-- HARGA -->
 
-            <div class="form-row">
+          <!-- HASIL -->
 
+          <div class="form-group">
 
-              <div class="form-group">
+            <label for="profitRugi">
+              Hasil Trading
+            </label>
 
-                <label for="harga">
-                  Harga
-                </label>
+            <div class="select-wrapper">
 
-                <input
-                  type="number"
-                  id="harga"
-                  name="harga"
-                  placeholder="8.200"
-                  min="0"
-                  step="1"
-                  inputmode="numeric"
-                  required
-                >
+              <select
+                id="profitRugi"
+                name="profitRugi"
+              >
 
-              </div>
+                <option value="">
+                  Tidak ada
+                </option>
 
+                <option value="PROFIT">
+                  PROFIT
+                </option>
 
-              <!-- LOT -->
+                <option value="RUGI">
+                  RUGI
+                </option>
 
-              <div class="form-group">
-
-                <label for="lot">
-                  Lot
-                </label>
-
-                <input
-                  type="number"
-                  id="lot"
-                  name="lot"
-                  placeholder="10"
-                  min="1"
-                  step="1"
-                  inputmode="numeric"
-                  required
-                >
-
-              </div>
+              </select>
 
             </div>
 
-
-            <!-- PROFIT / RUGI -->
-
-            <div class="form-group">
-
-              <label for="profitRugi">
-                Hasil Trading
-              </label>
-
-              <div class="select-wrapper">
-
-                <select
-                  id="profitRugi"
-                  name="profitRugi"
-                >
-
-                  <option value="">
-                    Tidak ada
-                  </option>
-
-                  <option value="PROFIT">
-                    PROFIT
-                  </option>
-
-                  <option value="RUGI">
-                    RUGI
-                  </option>
-
-                </select>
-
-              </div>
-
-            </div>
+          </div>
 
 
-            <!-- NOMINAL -->
 
-            <div
-              class="form-group"
-              id="nominalGroup"
-            >
+          <!-- NOMINAL -->
 
-              <label for="nominal">
-                Nominal
-              </label>
+          <div
+            class="form-group"
+            id="nominalGroup"
+          >
 
-              <div class="input-money">
+            <label for="nominal">
+              Nominal
+            </label>
 
-                <span>
-                  Rp
-                </span>
-
-                <input
-                  type="number"
-                  id="nominal"
-                  name="nominal"
-                  placeholder="300000"
-                  min="0"
-                  step="1"
-                  inputmode="numeric"
-                >
-
-              </div>
-
-            </div>
-
-
-            <!-- CATATAN -->
-
-            <div class="form-group">
-
-              <label for="catatan">
-                Catatan
-              </label>
-
-              <textarea
-                id="catatan"
-                name="catatan"
-                rows="3"
-                maxlength="500"
-                placeholder="Contoh: TP, cut loss, entry..."
-              ></textarea>
-
-            </div>
-
-
-            <!-- SUBMIT -->
-
-            <button
-              type="submit"
-              id="saveTransactionButton"
-              class="primary-button"
-            >
+            <div class="input-money">
 
               <span>
-                Simpan Transaksi
+                Rp
               </span>
 
-              <span class="button-arrow">
-                →
-              </span>
-
-            </button>
-
-          </form>
-
-        </div>
-
-
-        <!-- =========================
-             RECENT TRANSACTIONS
-        ========================== -->
-
-        <div class="panel history-panel">
-
-          <div class="panel-header">
-
-            <div>
-
-              <div class="panel-title">
-                Transaksi Terbaru
-              </div>
-
-              <div class="panel-subtitle">
-                Aktivitas trading terakhir
-              </div>
-
-            </div>
-
-            <a
-              href="laporan.html"
-              class="view-all-link"
-            >
-              Lihat semua →
-            </a>
-
-          </div>
-
-
-          <!-- LOADING -->
-
-          <div
-            id="transactionLoading"
-            class="loading-state"
-          >
-
-            <div class="spinner"></div>
-
-            <span>
-              Memuat transaksi...
-            </span>
-
-          </div>
-
-
-          <!-- EMPTY -->
-
-          <div
-            id="transactionEmpty"
-            class="empty-state hidden"
-          >
-
-            <div class="empty-icon">
-              ◫
-            </div>
-
-            <h3>
-              Belum ada transaksi
-            </h3>
-
-            <p>
-              Transaksi yang kamu simpan akan muncul di sini.
-            </p>
-
-          </div>
-
-
-          <!-- TABLE -->
-
-          <div
-            id="transactionTableWrapper"
-            class="table-wrapper hidden"
-          >
-
-            <table class="transaction-table">
-
-              <thead>
-
-                <tr>
-
-                  <th>
-                    Tanggal
-                  </th>
-
-                  <th>
-                    Saham
-                  </th>
-
-                  <th>
-                    Aksi
-                  </th>
-
-                  <th>
-                    Harga
-                  </th>
-
-                  <th>
-                    Lot
-                  </th>
-
-                  <th>
-                    Hasil
-                  </th>
-
-                  <th>
-                    Nominal
-                  </th>
-
-                </tr>
-
-              </thead>
-
-              <tbody
-                id="transactionTableBody"
+              <input
+                type="number"
+                id="nominal"
+                name="nominal"
+                placeholder="300000"
+                min="0"
+                step="1"
+                inputmode="numeric"
               >
-              </tbody>
 
-            </table>
-
-          </div>
-
-        </div>
-
-      </section>
-
-    </main>
-
-
-    <!-- =========================
-         FOOTER
-    ========================== -->
-
-    <footer class="footer">
-
-      <span>
-        Trading Journal
-      </span>
-
-      <span>
-        Data tersimpan di Google Sheets
-      </span>
-
-    </footer>
-
-  </div>
-
-
-  <!-- =========================
-       ADD MODAL POPUP
-  ========================== -->
-
-  <div
-    id="addModal"
-    class="modal-overlay hidden"
-  >
-
-    <div class="modal-box">
-
-      <div class="modal-header">
-
-        <div>
-
-          <h2>
-            Tambah Modal
-          </h2>
-
-          <p>
-            Tambahkan dana ke modal trading.
-          </p>
-
-        </div>
-
-        <button
-          type="button"
-          class="modal-close"
-          data-close-modal
-        >
-          ×
-        </button>
-
-      </div>
-
-
-      <form
-        id="addModalForm"
-        class="modal-form"
-      >
-
-        <div class="form-group">
-
-          <label for="addModalTanggal">
-            Tanggal
-          </label>
-
-          <input
-            type="date"
-            id="addModalTanggal"
-            required
-          >
-
-        </div>
-
-
-        <div class="form-group">
-
-          <label for="addModalNominal">
-            Nominal
-          </label>
-
-          <div class="input-money">
-
-            <span>
-              Rp
-            </span>
-
-            <input
-              type="number"
-              id="addModalNominal"
-              placeholder="5.000.000"
-              min="1"
-              step="1"
-              inputmode="numeric"
-              required
-            >
+            </div>
 
           </div>
 
-        </div>
 
 
-        <div class="form-group">
+          <!-- CATATAN -->
 
-          <label for="addModalCatatan">
-            Catatan
-            <small>
-              Opsional
-            </small>
-          </label>
+          <div class="form-group">
 
-          <textarea
-            id="addModalCatatan"
-            rows="3"
-            maxlength="500"
-            placeholder="Contoh: Tambah modal"
-          ></textarea>
+            <label for="catatan">
+              Catatan
+            </label>
 
-        </div>
+            <textarea
+              id="catatan"
+              name="catatan"
+              rows="3"
+              maxlength="500"
+              placeholder="Contoh: TP, cut loss, entry..."
+            ></textarea>
+
+          </div>
 
 
-        <div class="modal-actions-bottom">
 
-          <button
-            type="button"
-            class="secondary-button"
-            data-close-modal
-          >
-            Batal
-          </button>
+          <!-- SUBMIT -->
 
           <button
             type="submit"
-            id="saveAddModalButton"
+            id="saveTransactionButton"
             class="primary-button"
           >
-            Simpan
+
+            <span>
+              Simpan Transaksi
+            </span>
+
+            <span class="button-arrow">
+              →
+            </span>
+
           </button>
 
-        </div>
-
-      </form>
-
-    </div>
-
-  </div>
-
-
-  <!-- =========================
-       WITHDRAW MODAL POPUP
-  ========================== -->
-
-  <div
-    id="withdrawModal"
-    class="modal-overlay hidden"
-  >
-
-    <div class="modal-box">
-
-      <div class="modal-header">
-
-        <div>
-
-          <h2>
-            Tarik Modal
-          </h2>
-
-          <p>
-            Tarik dana dari modal trading.
-          </p>
-
-        </div>
-
-        <button
-          type="button"
-          class="modal-close"
-          data-close-modal
-        >
-          ×
-        </button>
+        </form>
 
       </div>
 
 
-      <form
-        id="withdrawModalForm"
-        class="modal-form"
+
+      <!-- =================================================
+           RECENT TRANSACTIONS
+      ================================================== -->
+
+      <div class="panel history-panel">
+
+        <div class="panel-header">
+
+          <div>
+
+            <div class="panel-title">
+              Transaksi Terbaru
+            </div>
+
+            <div class="panel-subtitle">
+              Aktivitas trading terakhir
+            </div>
+
+          </div>
+
+
+          <a
+            href="laporan.html"
+            class="view-all-link"
+          >
+            Lihat semua →
+          </a>
+
+        </div>
+
+
+
+        <!-- LOADING -->
+
+        <div
+          id="transactionLoading"
+          class="loading-state"
+        >
+
+          <div class="spinner"></div>
+
+          <span>
+            Memuat transaksi...
+          </span>
+
+        </div>
+
+
+
+        <!-- EMPTY -->
+
+        <div
+          id="transactionEmpty"
+          class="empty-state hidden"
+        >
+
+          <div class="empty-icon">
+            ◫
+          </div>
+
+          <h3>
+            Belum ada transaksi
+          </h3>
+
+          <p>
+            Transaksi yang kamu simpan akan muncul di sini.
+          </p>
+
+        </div>
+
+
+
+        <!-- TABLE -->
+
+        <div
+          id="transactionTableWrapper"
+          class="table-wrapper hidden"
+        >
+
+          <table class="transaction-table">
+
+            <thead>
+
+              <tr>
+
+                <th>
+                  Tanggal
+                </th>
+
+                <th>
+                  Saham
+                </th>
+
+                <th>
+                  Aksi
+                </th>
+
+                <th>
+                  Harga
+                </th>
+
+                <th>
+                  Lot
+                </th>
+
+                <th>
+                  Hasil
+                </th>
+
+                <th>
+                  Nominal
+                </th>
+
+                <th>
+                  Aksi
+                </th>
+
+              </tr>
+
+            </thead>
+
+
+            <tbody
+              id="transactionTableBody"
+            >
+            </tbody>
+
+          </table>
+
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+
+
+  <!-- =====================================================
+       FOOTER
+  ====================================================== -->
+
+  <footer class="footer">
+
+    <span>
+      Trading Journal
+    </span>
+
+    <span>
+      Data tersimpan di Google Sheets
+    </span>
+
+  </footer>
+
+</div>
+
+
+
+<!-- =======================================================
+     ADD CAPITAL MODAL
+======================================================== -->
+
+<div
+  id="addModal"
+  class="modal-overlay hidden"
+>
+
+  <div class="modal-box">
+
+    <div class="modal-header">
+
+      <div>
+
+        <h2>
+          Tambah Modal
+        </h2>
+
+        <p>
+          Tambahkan dana ke modal trading.
+        </p>
+
+      </div>
+
+
+      <button
+        type="button"
+        class="modal-close"
+        data-close-modal
       >
+        ×
+      </button>
+
+    </div>
+
+
+
+    <form
+      id="addModalForm"
+      class="modal-form"
+    >
+
+
+      <div class="form-group">
+
+        <label for="addModalTanggal">
+          Tanggal
+        </label>
+
+        <input
+          type="date"
+          id="addModalTanggal"
+          required
+        >
+
+      </div>
+
+
+
+      <div class="form-group">
+
+        <label for="addModalNominal">
+          Nominal
+        </label>
+
+        <div class="input-money">
+
+          <span>
+            Rp
+          </span>
+
+          <input
+            type="number"
+            id="addModalNominal"
+            placeholder="5000000"
+            min="1"
+            step="1"
+            inputmode="numeric"
+            required
+          >
+
+        </div>
+
+      </div>
+
+
+
+      <div class="form-group">
+
+        <label for="addModalCatatan">
+
+          Catatan
+
+          <small>
+            Opsional
+          </small>
+
+        </label>
+
+        <textarea
+          id="addModalCatatan"
+          rows="3"
+          maxlength="500"
+          placeholder="Contoh: Tambah modal"
+        ></textarea>
+
+      </div>
+
+
+
+      <div class="modal-actions-bottom">
+
+        <button
+          type="button"
+          class="secondary-button"
+          data-close-modal
+        >
+          Batal
+        </button>
+
+
+        <button
+          type="submit"
+          id="saveAddModalButton"
+          class="primary-button"
+        >
+          Simpan
+        </button>
+
+      </div>
+
+    </form>
+
+  </div>
+
+</div>
+
+
+
+<!-- =======================================================
+     WITHDRAW MODAL
+======================================================== -->
+
+<div
+  id="withdrawModal"
+  class="modal-overlay hidden"
+>
+
+  <div class="modal-box">
+
+    <div class="modal-header">
+
+      <div>
+
+        <h2>
+          Tarik Modal
+        </h2>
+
+        <p>
+          Tarik dana dari modal trading.
+        </p>
+
+      </div>
+
+
+      <button
+        type="button"
+        class="modal-close"
+        data-close-modal
+      >
+        ×
+      </button>
+
+    </div>
+
+
+
+    <form
+      id="withdrawModalForm"
+      class="modal-form"
+    >
+
+
+      <div class="form-group">
+
+        <label for="withdrawModalTanggal">
+          Tanggal
+        </label>
+
+        <input
+          type="date"
+          id="withdrawModalTanggal"
+          required
+        >
+
+      </div>
+
+
+
+      <div class="form-group">
+
+        <label for="withdrawModalNominal">
+          Nominal
+        </label>
+
+        <div class="input-money">
+
+          <span>
+            Rp
+          </span>
+
+          <input
+            type="number"
+            id="withdrawModalNominal"
+            placeholder="2000000"
+            min="1"
+            step="1"
+            inputmode="numeric"
+            required
+          >
+
+        </div>
+
+      </div>
+
+
+
+      <div class="form-group">
+
+        <label for="withdrawModalCatatan">
+
+          Catatan
+
+          <small>
+            Opsional
+          </small>
+
+        </label>
+
+        <textarea
+          id="withdrawModalCatatan"
+          rows="3"
+          maxlength="500"
+          placeholder="Contoh: Tarik dana"
+        ></textarea>
+
+      </div>
+
+
+
+      <div class="modal-actions-bottom">
+
+        <button
+          type="button"
+          class="secondary-button"
+          data-close-modal
+        >
+          Batal
+        </button>
+
+
+        <button
+          type="submit"
+          id="saveWithdrawModalButton"
+          class="danger-button"
+        >
+          Tarik Modal
+        </button>
+
+      </div>
+
+    </form>
+
+  </div>
+
+</div>
+
+
+
+<!-- =======================================================
+     EDIT TRANSACTION MODAL
+======================================================== -->
+
+<div
+  id="editTransactionModal"
+  class="modal-overlay hidden"
+>
+
+  <div class="modal-box">
+
+    <div class="modal-header">
+
+      <div>
+
+        <h2>
+          Edit Transaksi
+        </h2>
+
+        <p>
+          Perbarui data transaksi trading.
+        </p>
+
+      </div>
+
+
+      <button
+        type="button"
+        class="modal-close"
+        data-close-edit
+      >
+        ×
+      </button>
+
+    </div>
+
+
+
+    <form
+      id="editTransactionForm"
+      class="modal-form"
+    >
+
+      <!-- ID TRANSAKSI -->
+
+      <input
+        type="hidden"
+        id="editTransactionId"
+      >
+
+
+      <!-- TANGGAL -->
+
+      <div class="form-group">
+
+        <label for="editTanggal">
+          Tanggal
+        </label>
+
+        <input
+          type="date"
+          id="editTanggal"
+          required
+        >
+
+      </div>
+
+
+
+      <!-- SAHAM -->
+
+      <div class="form-group">
+
+        <label for="editSaham">
+          Saham
+        </label>
+
+        <input
+          type="text"
+          id="editSaham"
+          maxlength="20"
+          autocomplete="off"
+          required
+        >
+
+      </div>
+
+
+
+      <!-- AKSI -->
+
+      <div class="form-group">
+
+        <label for="editAksi">
+          Aksi
+        </label>
+
+        <div class="select-wrapper">
+
+          <select
+            id="editAksi"
+            required
+          >
+
+            <option value="BUY">
+              BUY
+            </option>
+
+            <option value="SELL">
+              SELL
+            </option>
+
+          </select>
+
+        </div>
+
+      </div>
+
+
+
+      <!-- HARGA + LOT -->
+
+      <div class="form-row">
 
         <div class="form-group">
 
-          <label for="withdrawModalTanggal">
-            Tanggal
+          <label for="editHarga">
+            Harga
           </label>
 
           <input
-            type="date"
-            id="withdrawModalTanggal"
+            type="number"
+            id="editHarga"
+            min="0"
+            step="1"
+            inputmode="numeric"
             required
           >
 
@@ -828,142 +1102,294 @@
 
         <div class="form-group">
 
-          <label for="withdrawModalNominal">
-            Nominal
+          <label for="editLot">
+            Lot
           </label>
 
-          <div class="input-money">
-
-            <span>
-              Rp
-            </span>
-
-            <input
-              type="number"
-              id="withdrawModalNominal"
-              placeholder="2.000.000"
-              min="1"
-              step="1"
-              inputmode="numeric"
-              required
-            >
-
-          </div>
-
-        </div>
-
-
-        <div class="form-group">
-
-          <label for="withdrawModalCatatan">
-            Catatan
-            <small>
-              Opsional
-            </small>
-          </label>
-
-          <textarea
-            id="withdrawModalCatatan"
-            rows="3"
-            maxlength="500"
-            placeholder="Contoh: Tarik dana"
-          ></textarea>
-
-        </div>
-
-
-        <div class="modal-actions-bottom">
-
-          <button
-            type="button"
-            class="secondary-button"
-            data-close-modal
+          <input
+            type="number"
+            id="editLot"
+            min="1"
+            step="1"
+            inputmode="numeric"
+            required
           >
-            Batal
-          </button>
-
-          <button
-            type="submit"
-            id="saveWithdrawModalButton"
-            class="danger-button"
-          >
-            Tarik Modal
-          </button>
 
         </div>
 
-      </form>
+      </div>
+
+
+
+      <!-- HASIL -->
+
+      <div class="form-group">
+
+        <label for="editProfitRugi">
+          Hasil Trading
+        </label>
+
+        <div class="select-wrapper">
+
+          <select
+            id="editProfitRugi"
+          >
+
+            <option value="">
+              Tidak ada
+            </option>
+
+            <option value="PROFIT">
+              PROFIT
+            </option>
+
+            <option value="RUGI">
+              RUGI
+            </option>
+
+          </select>
+
+        </div>
+
+      </div>
+
+
+
+      <!-- NOMINAL -->
+
+      <div class="form-group">
+
+        <label for="editNominal">
+          Nominal
+        </label>
+
+        <div class="input-money">
+
+          <span>
+            Rp
+          </span>
+
+          <input
+            type="number"
+            id="editNominal"
+            min="0"
+            step="1"
+            inputmode="numeric"
+          >
+
+        </div>
+
+      </div>
+
+
+
+      <!-- CATATAN -->
+
+      <div class="form-group">
+
+        <label for="editCatatan">
+          Catatan
+        </label>
+
+        <textarea
+          id="editCatatan"
+          rows="3"
+          maxlength="500"
+          placeholder="Catatan transaksi..."
+        ></textarea>
+
+      </div>
+
+
+
+      <!-- ACTION -->
+
+      <div class="modal-actions-bottom">
+
+        <button
+          type="button"
+          class="secondary-button"
+          data-close-edit
+        >
+          Batal
+        </button>
+
+
+        <button
+          type="submit"
+          id="updateTransactionButton"
+          class="primary-button"
+        >
+          Simpan Perubahan
+        </button>
+
+      </div>
+
+    </form>
+
+  </div>
+
+</div>
+
+
+
+<!-- =======================================================
+     DELETE CONFIRMATION MODAL
+======================================================== -->
+
+<div
+  id="deleteTransactionModal"
+  class="modal-overlay hidden"
+>
+
+  <div class="modal-box delete-confirm-box">
+
+    <div class="modal-header">
+
+      <div>
+
+        <h2>
+          Hapus Transaksi?
+        </h2>
+
+        <p>
+          Data transaksi ini akan dihapus dari sistem.
+        </p>
+
+      </div>
+
+
+      <button
+        type="button"
+        class="modal-close"
+        data-close-delete
+      >
+        ×
+      </button>
+
+    </div>
+
+
+
+    <input
+      type="hidden"
+      id="deleteTransactionId"
+    >
+
+
+    <div class="delete-warning">
+
+      <div class="empty-icon">
+        !
+      </div>
+
+      <p>
+        Tindakan ini tidak dapat dibatalkan.
+      </p>
+
+    </div>
+
+
+
+    <div class="modal-actions-bottom">
+
+      <button
+        type="button"
+        class="secondary-button"
+        data-close-delete
+      >
+        Batal
+      </button>
+
+
+      <button
+        type="button"
+        id="confirmDeleteTransactionButton"
+        class="danger-button"
+      >
+        Hapus Transaksi
+      </button>
 
     </div>
 
   </div>
 
+</div>
 
-  <!-- =========================
-       TOAST
-  ========================== -->
+
+
+<!-- =======================================================
+     TOAST
+======================================================== -->
+
+<div
+  id="toast"
+  class="toast hidden"
+>
 
   <div
-    id="toast"
-    class="toast hidden"
+    id="toastIcon"
+    class="toast-icon"
   >
+    ✓
+  </div>
+
+
+  <div>
 
     <div
-      id="toastIcon"
-      class="toast-icon"
+      id="toastTitle"
+      class="toast-title"
     >
-      ✓
+      Berhasil
     </div>
 
-    <div>
 
-      <div
-        id="toastTitle"
-        class="toast-title"
-      >
-        Berhasil
-      </div>
-
-      <div
-        id="toastMessage"
-        class="toast-message"
-      >
-        Data berhasil disimpan.
-      </div>
-
+    <div
+      id="toastMessage"
+      class="toast-message"
+    >
+      Data berhasil disimpan.
     </div>
 
   </div>
 
+</div>
 
-  <!-- =========================
-       GLOBAL LOADING
-  ========================== -->
 
-  <div
-    id="globalLoading"
-    class="global-loading hidden"
-  >
 
-    <div class="global-loading-box">
+<!-- =======================================================
+     GLOBAL LOADING
+======================================================== -->
 
-      <div class="spinner"></div>
+<div
+  id="globalLoading"
+  class="global-loading hidden"
+>
 
-      <span id="globalLoadingText">
-        Menyimpan...
-      </span>
+  <div class="global-loading-box">
 
-    </div>
+    <div class="spinner"></div>
+
+    <span id="globalLoadingText">
+      Memuat...
+    </span>
 
   </div>
 
+</div>
 
-  <!-- =========================
-       JAVASCRIPT
-  ========================== -->
 
-  <script src="js/api.js"></script>
-  <script src="js/trading.js"></script>
+
+<!-- =======================================================
+     JAVASCRIPT
+======================================================== -->
+
+<script src="js/api.js"></script>
+
+<script src="js/trading.js"></script>
+
 
 </body>
+
 </html>
