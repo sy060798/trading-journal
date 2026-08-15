@@ -1,6 +1,7 @@
 /* =========================================================
    TRADING JOURNAL
    trading.js
+   VERSION: FINAL UPDATE
 ========================================================= */
 
 "use strict";
@@ -12,8 +13,11 @@
 
 let transactions = [];
 let capitalData = {};
+let summaryData = {};
 
 let currentTransactionId = null;
+
+let isLoadingTradingData = false;
 
 
 /* =========================================================
@@ -22,7 +26,7 @@ let currentTransactionId = null;
 
 document.addEventListener(
   "DOMContentLoaded",
-  () => {
+  function () {
 
     initializeTradingPage();
 
@@ -55,10 +59,10 @@ async function initializeTradingPage() {
 
 function setDefaultDate() {
 
-  const dateInput =
+  const input =
     document.getElementById("tanggal");
 
-  if (!dateInput) {
+  if (!input) {
     return;
   }
 
@@ -83,7 +87,7 @@ function setDefaultDate() {
     ).padStart(2, "0");
 
 
-  dateInput.value =
+  input.value =
     `${year}-${month}-${day}`;
 
 }
@@ -111,10 +115,6 @@ function setupFormEvents() {
     handleTransactionSubmit
   );
 
-
-  /*
-   * Jika tombol reset tersedia
-   */
 
   const resetButton =
     document.getElementById(
@@ -150,7 +150,11 @@ function setupActionButtons() {
 
     addCapitalButton.addEventListener(
       "click",
-      () => openCapitalModal("add")
+      function () {
+
+        openCapitalModal("add");
+
+      }
     );
 
   }
@@ -166,7 +170,11 @@ function setupActionButtons() {
 
     withdrawButton.addEventListener(
       "click",
-      () => openCapitalModal("withdraw")
+      function () {
+
+        openCapitalModal("withdraw");
+
+      }
     );
 
   }
@@ -182,7 +190,11 @@ function setupActionButtons() {
 
     refreshButton.addEventListener(
       "click",
-      loadTradingData
+      function () {
+
+        loadTradingData();
+
+      }
     );
 
   }
@@ -191,10 +203,18 @@ function setupActionButtons() {
 
 
 /* =========================================================
-   LOAD DATA
+   LOAD ALL DATA
 ========================================================= */
 
 async function loadTradingData() {
+
+  if (isLoadingTradingData) {
+    return;
+  }
+
+
+  isLoadingTradingData = true;
+
 
   showGlobalLoading(
     true,
@@ -204,26 +224,99 @@ async function loadTradingData() {
 
   try {
 
-    const [
-      transactionResult,
-      capitalResult
-    ] = await Promise.all([
-      getTransactions(),
-      getCapital()
-    ]);
+    /*
+     * Kita gunakan SATU request.
+     *
+     * Apps Script mengembalikan:
+     *
+     * {
+     *   success: true,
+     *   data: {
+     *      transaksi: [],
+     *      modal: [],
+     *      summary: {}
+     *   }
+     * }
+     */
+
+    let result;
+
+
+    if (
+      window.TradingAPI &&
+      typeof window.TradingAPI.getAllData === "function"
+    ) {
+
+      result =
+        await window.TradingAPI.getAllData();
+
+    } else if (
+      window.TradingAPI &&
+      typeof window.TradingAPI.request === "function"
+    ) {
+
+      /*
+       * Fallback jika api.js belum menyediakan
+       * getAllData().
+       */
+
+      const response =
+        await window.TradingAPI.request(
+          "getAllData"
+        );
+
+
+      result =
+        response?.data ||
+        response ||
+        {};
+
+    } else {
+
+      throw new Error(
+        "TradingAPI belum tersedia. Pastikan api.js dimuat sebelum trading.js."
+      );
+
+    }
+
+
+    /*
+     * Normalisasi response.
+     */
+
+    if (
+      result &&
+      result.data &&
+      !result.transaksi
+    ) {
+
+      result =
+        result.data;
+
+    }
 
 
     transactions =
       Array.isArray(
-        transactionResult
+        result?.transaksi
       )
-        ? transactionResult
+        ? result.transaksi
         : [];
 
 
     capitalData =
-      capitalResult || {};
+      result?.summary ||
+      {};
 
+
+    summaryData =
+      result?.summary ||
+      {};
+
+
+    /*
+     * Render UI.
+     */
 
     updateCapitalDisplay();
 
@@ -240,14 +333,26 @@ async function loadTradingData() {
     );
 
 
+    /*
+     * Jangan biarkan halaman kosong.
+     */
+
+    transactions =
+      Array.isArray(transactions)
+        ? transactions
+        : [];
+
+
     showToast(
-      "Gagal",
+      "Gagal memuat data",
       getApiErrorMessage(error),
       "error"
     );
 
 
   } finally {
+
+    isLoadingTradingData = false;
 
     showGlobalLoading(
       false
@@ -310,7 +415,23 @@ async function handleTransactionSubmit(
 
   try {
 
-    await addTransaction(
+    /*
+     * Gunakan TradingAPI.
+     */
+
+    if (
+      !window.TradingAPI ||
+      typeof window.TradingAPI.addTransaction !== "function"
+    ) {
+
+      throw new Error(
+        "Fungsi addTransaction tidak tersedia di api.js."
+      );
+
+    }
+
+
+    await window.TradingAPI.addTransaction(
       transaction
     );
 
@@ -324,6 +445,10 @@ async function handleTransactionSubmit(
 
     resetTransactionForm();
 
+
+    /*
+     * Reload semua data.
+     */
 
     await loadTradingData();
 
@@ -355,7 +480,7 @@ async function handleTransactionSubmit(
 
 
 /* =========================================================
-   COLLECT FORM
+   COLLECT TRANSACTION DATA
 ========================================================= */
 
 function collectTransactionData(
@@ -387,9 +512,21 @@ function collectTransactionData(
     getValue("lot");
 
 
+  /*
+   * HTML kemungkinan memakai:
+   *
+   * hasil
+   *
+   * sedangkan backend memakai:
+   *
+   * profitRugi
+   */
+
   const hasil =
     formData.get("hasil") ||
-    getValue("hasil");
+    formData.get("profitRugi") ||
+    getValue("hasil") ||
+    getValue("profitRugi");
 
 
   const nominal =
@@ -405,17 +542,23 @@ function collectTransactionData(
   return {
 
     tanggal:
-      tanggal,
+      String(
+        tanggal || ""
+      ).trim(),
 
     saham:
-      String(saham)
-        .trim()
-        .toUpperCase(),
+      String(
+        saham || ""
+      )
+      .trim()
+      .toUpperCase(),
 
     aksi:
-      String(aksi)
-        .trim()
-        .toUpperCase(),
+      String(
+        aksi || ""
+      )
+      .trim()
+      .toUpperCase(),
 
     harga:
       parseNumber(harga),
@@ -423,15 +566,20 @@ function collectTransactionData(
     lot:
       parseNumber(lot),
 
-    hasil:
+    /*
+     * Kirim dengan nama yang dipakai Apps Script.
+     */
+
+    profitRugi:
       normalizeResult(hasil),
 
     nominal:
       parseNumber(nominal),
 
     catatan:
-      String(catatan || "")
-        .trim()
+      String(
+        catatan || ""
+      ).trim()
 
   };
 
@@ -439,7 +587,7 @@ function collectTransactionData(
 
 
 /* =========================================================
-   VALIDATION
+   VALIDATE TRANSACTION
 ========================================================= */
 
 function validateTransaction(
@@ -466,11 +614,15 @@ function validateTransaction(
   }
 
 
-  if (!transaction.aksi) {
+  if (
+    !["BUY", "SELL"].includes(
+      transaction.aksi
+    )
+  ) {
 
     return {
       valid: false,
-      message: "Aksi transaksi wajib dipilih."
+      message: "Aksi harus BUY atau SELL."
     };
 
   }
@@ -507,21 +659,43 @@ function validateTransaction(
 
 
   /*
-   * Hasil dan nominal boleh kosong.
-   * Jadi transaksi BUY tidak wajib
-   * mempunyai profit/loss.
+   * Profit/Rugi boleh kosong.
    */
 
   if (
-    transaction.nominal !== 0 &&
-    !Number.isFinite(
-      transaction.nominal
+    transaction.profitRugi &&
+    !["PROFIT", "RUGI"].includes(
+      transaction.profitRugi
     )
   ) {
 
     return {
       valid: false,
-      message: "Nominal profit/rugi tidak valid."
+      message: "Hasil harus PROFIT atau RUGI."
+    };
+
+  }
+
+
+  /*
+   * Jika PROFIT/RUGI dipilih,
+   * nominal harus lebih dari 0.
+   */
+
+  if (
+    transaction.profitRugi &&
+    (
+      !Number.isFinite(
+        transaction.nominal
+      ) ||
+      transaction.nominal <= 0
+    )
+  ) {
+
+    return {
+      valid: false,
+      message:
+        "Nominal profit/rugi wajib diisi."
     };
 
   }
@@ -597,7 +771,7 @@ function renderTransactions() {
 
 
   if (
-    !transactions ||
+    !Array.isArray(transactions) ||
     transactions.length === 0
   ) {
 
@@ -630,70 +804,84 @@ function renderTransactions() {
   );
 
 
-  /*
-   * Transaksi terbaru di atas.
-   */
-
   const sorted =
-    [...transactions].sort(
-      sortTransactions
-    );
+    [...transactions]
+      .sort(sortTransactions);
 
 
   sorted.forEach(
-    transaction => {
+    function (transaction) {
 
       const row =
-        document.createElement(
-          "tr"
-        );
+        document.createElement("tr");
 
 
       const tanggal =
         formatDate(
+          transaction.Tanggal ??
           transaction.tanggal
         );
 
 
       const saham =
         escapeHtml(
-          transaction.saham || "-"
+          transaction.Saham ??
+          transaction.saham ??
+          "-"
         );
 
 
       const aksi =
         String(
-          transaction.aksi || "-"
-        ).toUpperCase();
+          transaction.Aksi ??
+          transaction.aksi ??
+          "-"
+        )
+        .toUpperCase();
 
 
       const harga =
-        formatRupiah(
+        parseNumber(
+          transaction.Harga ??
           transaction.harga
         );
 
 
       const lot =
-        formatNumber(
+        parseNumber(
+          transaction.Lot ??
           transaction.lot
         );
 
 
+      /*
+       * Backend menggunakan:
+       *
+       * Profit/Rugi
+       *
+       * tetapi nama object memiliki karakter.
+       */
+
       const hasil =
         normalizeResult(
+          transaction["Profit/Rugi"] ??
+          transaction.profitRugi ??
           transaction.hasil
         );
 
 
       const nominal =
-        Number(
+        parseNumber(
+          transaction.Nominal ??
           transaction.nominal
-        ) || 0;
+        );
 
 
       const catatan =
         escapeHtml(
-          transaction.catatan || "-"
+          transaction.Catatan ??
+          transaction.catatan ??
+          "-"
         );
 
 
@@ -716,11 +904,11 @@ function renderTransactions() {
         </td>
 
         <td>
-          ${harga}
+          ${formatRupiah(harga)}
         </td>
 
         <td>
-          ${lot}
+          ${formatNumber(lot)}
         </td>
 
         <td>
@@ -739,10 +927,10 @@ function renderTransactions() {
           }
         </td>
 
-        <td class="${getAmountClass(nominal)}">
+        <td class="${getAmountClassByResult(hasil)}">
           ${
-            nominal
-              ? formatSignedRupiah(nominal)
+            nominal > 0
+              ? formatRupiah(nominal)
               : "-"
           }
         </td>
@@ -768,7 +956,7 @@ function renderTransactions() {
 
 
 /* =========================================================
-   SORT TRANSACTIONS
+   SORT
 ========================================================= */
 
 function sortTransactions(
@@ -777,33 +965,26 @@ function sortTransactions(
 ) {
 
   const dateA =
-    new Date(
-      a.tanggal || 0
-    ).getTime();
+    parseDateValue(
+      a.Tanggal ??
+      a.tanggal
+    );
 
 
   const dateB =
-    new Date(
-      b.tanggal || 0
-    ).getTime();
+    parseDateValue(
+      b.Tanggal ??
+      b.tanggal
+    );
 
 
-  if (
-    dateA !== dateB
-  ) {
-
-    return dateB - dateA;
-
-  }
-
-
-  return 0;
+  return dateB - dateA;
 
 }
 
 
 /* =========================================================
-   UPDATE TRANSACTION COUNT
+   TRANSACTION COUNT
 ========================================================= */
 
 function updateTransactionCount() {
@@ -828,113 +1009,219 @@ function updateTransactionCount() {
 
 
 /* =========================================================
-   UPDATE CAPITAL
+   CAPITAL DISPLAY
 ========================================================= */
 
 function updateCapitalDisplay() {
 
   /*
-   * Mendukung beberapa nama field
-   * supaya fleksibel terhadap Code.gs.
+   * Data berasal dari:
+   *
+   * summary:
+   *
+   * modalAwal
+   * totalTambah
+   * totalTarik
+   * modal
+   * totalProfit
+   * totalRugi
+   * netProfit
+   * total
    */
 
-  const initial =
-    getCapitalValue(
-      [
-        "modalAwal",
-        "modal_awal",
-        "initialCapital",
-        "initial",
-        "modal"
-      ]
+
+  const modalAwal =
+    getSummaryNumber(
+      "modalAwal"
     );
 
 
-  const added =
-    getCapitalValue(
-      [
-        "tambahModal",
-        "tambah_modal",
-        "addedCapital",
-        "added"
-      ]
+  const totalTambah =
+    getSummaryNumber(
+      "totalTambah"
     );
 
 
-  const withdrawn =
-    getCapitalValue(
-      [
-        "tarikModal",
-        "tarik_modal",
-        "withdrawnCapital",
-        "withdrawn"
-      ]
+  const totalTarik =
+    getSummaryNumber(
+      "totalTarik"
     );
 
 
-  const current =
-    getCapitalValue(
-      [
-        "modalSekarang",
-        "modal_sekarang",
-        "currentCapital",
-        "current",
-        "saldo"
-      ]
+  let modal =
+    getSummaryNumber(
+      "modal"
     );
 
 
   /*
-   * Jika backend tidak memberikan
-   * current secara langsung,
-   * hitung otomatis.
+   * Fallback hitung modal.
    */
 
-  const calculatedCurrent =
-    current !== null
-      ? current
-      : initial + added - withdrawn;
+  if (
+    modal === 0 &&
+    (
+      modalAwal !== 0 ||
+      totalTambah !== 0 ||
+      totalTarik !== 0
+    )
+  ) {
 
+    modal =
+      modalAwal +
+      totalTambah -
+      totalTarik;
+
+  }
+
+
+  const totalProfit =
+    getSummaryNumber(
+      "totalProfit"
+    );
+
+
+  const totalRugi =
+    getSummaryNumber(
+      "totalRugi"
+    );
+
+
+  const netProfit =
+    getSummaryNumber(
+      "netProfit"
+    );
+
+
+  const total =
+    getSummaryNumber(
+      "total"
+    );
+
+
+  /*
+   * Simpan ke state.
+   */
+
+  capitalData = {
+    modalAwal:
+      modalAwal,
+
+    totalTambah:
+      totalTambah,
+
+    totalTarik:
+      totalTarik,
+
+    modal:
+      modal,
+
+    totalProfit:
+      totalProfit,
+
+    totalRugi:
+      totalRugi,
+
+    netProfit:
+      netProfit,
+
+    total:
+      total
+  };
+
+
+  /*
+   * Update elemen halaman.
+   */
 
   setText(
     "modalAwal",
-    formatRupiah(initial)
+    formatRupiah(modalAwal)
   );
 
 
   setText(
     "tambahModal",
-    formatRupiah(added)
+    formatRupiah(totalTambah)
   );
 
 
   setText(
     "tarikModal",
-    formatRupiah(withdrawn)
+    formatRupiah(totalTarik)
   );
 
 
   setText(
     "modalSekarang",
-    formatRupiah(calculatedCurrent)
+    formatRupiah(modal)
   );
 
 
-  /*
-   * Beberapa kemungkinan ID
-   * untuk kartu modal di index.
-   */
-
   setText(
     "currentCapital",
-    formatRupiah(calculatedCurrent)
+    formatRupiah(modal)
   );
 
 
   setText(
     "capitalValue",
-    formatRupiah(calculatedCurrent)
+    formatRupiah(modal)
   );
+
+
+  setText(
+    "totalProfit",
+    formatRupiah(totalProfit)
+  );
+
+
+  setText(
+    "totalRugi",
+    formatRupiah(totalRugi)
+  );
+
+
+  setText(
+    "netProfit",
+    formatSignedRupiah(netProfit)
+  );
+
+
+  setText(
+    "totalCapital",
+    formatRupiah(total)
+  );
+
+}
+
+
+/* =========================================================
+   SUMMARY NUMBER
+========================================================= */
+
+function getSummaryNumber(
+  key
+) {
+
+  const value =
+    summaryData?.[key];
+
+
+  const number =
+    Number(value);
+
+
+  if (
+    Number.isFinite(number)
+  ) {
+
+    return number;
+
+  }
+
+
+  return 0;
 
 }
 
@@ -952,7 +1239,7 @@ function setupModalEvents() {
 
 
   closeButtons.forEach(
-    button => {
+    function (button) {
 
       button.addEventListener(
         "click",
@@ -973,7 +1260,7 @@ function setupModalEvents() {
 
     overlay.addEventListener(
       "click",
-      event => {
+      function (event) {
 
         if (
           event.target === overlay
@@ -1007,7 +1294,7 @@ function setupModalEvents() {
 
   document.addEventListener(
     "keydown",
-    event => {
+    function (event) {
 
       if (
         event.key === "Escape"
@@ -1040,7 +1327,7 @@ function openCapitalModal(
   if (!modal) {
 
     console.warn(
-      "Element #capitalModal tidak ditemukan."
+      "#capitalModal tidak ditemukan."
     );
 
     return;
@@ -1104,10 +1391,28 @@ function openCapitalModal(
 
     amountInput.value = "";
 
+
     setTimeout(
-      () => amountInput.focus(),
+      function () {
+
+        amountInput.focus();
+
+      },
       100
     );
+
+  }
+
+
+  const noteInput =
+    document.getElementById(
+      "capitalNote"
+    );
+
+
+  if (noteInput) {
+
+    noteInput.value = "";
 
   }
 
@@ -1116,10 +1421,12 @@ function openCapitalModal(
     "hidden"
   );
 
+
   modal.setAttribute(
     "aria-hidden",
     "false"
   );
+
 
   document.body.style.overflow =
     "hidden";
@@ -1148,10 +1455,12 @@ function closeCapitalModal() {
     "hidden"
   );
 
+
   modal.setAttribute(
     "aria-hidden",
     "true"
   );
+
 
   document.body.style.overflow =
     "";
@@ -1170,37 +1479,25 @@ async function handleCapitalSubmit(
   event.preventDefault();
 
 
-  const typeInput =
+  const type =
     document.getElementById(
       "capitalType"
-    );
-
-
-  const amountInput =
-    document.getElementById(
-      "capitalAmount"
-    );
-
-
-  const noteInput =
-    document.getElementById(
-      "capitalNote"
-    );
-
-
-  const type =
-    typeInput?.value ||
+    )?.value ||
     "add";
 
 
   const amount =
     parseNumber(
-      amountInput?.value
+      document.getElementById(
+        "capitalAmount"
+      )?.value
     );
 
 
   const note =
-    noteInput?.value?.trim() ||
+    document.getElementById(
+      "capitalNote"
+    )?.value?.trim() ||
     "";
 
 
@@ -1211,7 +1508,7 @@ async function handleCapitalSubmit(
 
     showToast(
       "Nominal tidak valid",
-      "Masukkan nominal yang lebih dari 0.",
+      "Masukkan nominal lebih dari 0.",
       "error"
     );
 
@@ -1221,8 +1518,7 @@ async function handleCapitalSubmit(
 
 
   /*
-   * Saat tarik modal,
-   * cek modal tersedia jika datanya ada.
+   * Cek modal ketika melakukan penarikan.
    */
 
   if (
@@ -1230,19 +1526,12 @@ async function handleCapitalSubmit(
   ) {
 
     const currentCapital =
-      getCapitalValue(
-        [
-          "modalSekarang",
-          "modal_sekarang",
-          "currentCapital",
-          "current",
-          "saldo"
-        ]
+      getSummaryNumber(
+        "modal"
       );
 
 
     if (
-      currentCapital !== null &&
       amount > currentCapital
     ) {
 
@@ -1270,17 +1559,51 @@ async function handleCapitalSubmit(
   try {
 
     if (
+      !window.TradingAPI
+    ) {
+
+      throw new Error(
+        "TradingAPI tidak tersedia."
+      );
+
+    }
+
+
+    if (
       type === "add"
     ) {
 
-      await addCapital(
+      if (
+        typeof window.TradingAPI.addCapital !== "function"
+      ) {
+
+        throw new Error(
+          "Fungsi addCapital tidak tersedia di api.js."
+        );
+
+      }
+
+
+      await window.TradingAPI.addCapital(
         amount,
         note
       );
 
+
     } else {
 
-      await withdrawCapital(
+      if (
+        typeof window.TradingAPI.withdrawCapital !== "function"
+      ) {
+
+        throw new Error(
+          "Fungsi withdrawCapital tidak tersedia di api.js."
+        );
+
+      }
+
+
+      await window.TradingAPI.withdrawCapital(
         amount,
         note
       );
@@ -1325,49 +1648,6 @@ async function handleCapitalSubmit(
     );
 
   }
-
-}
-
-
-/* =========================================================
-   CAPITAL VALUE HELPER
-========================================================= */
-
-function getCapitalValue(
-  keys
-) {
-
-  for (
-    const key of keys
-  ) {
-
-    if (
-      capitalData &&
-      capitalData[key] !== undefined &&
-      capitalData[key] !== null &&
-      capitalData[key] !== ""
-    ) {
-
-      const value =
-        Number(
-          capitalData[key]
-        );
-
-
-      if (
-        Number.isFinite(value)
-      ) {
-
-        return value;
-
-      }
-
-    }
-
-  }
-
-
-  return 0;
 
 }
 
@@ -1432,7 +1712,7 @@ function getActionClass(
 ) {
 
   const value =
-    String(action)
+    String(action || "")
       .toUpperCase();
 
 
@@ -1491,19 +1771,15 @@ function getResultClass(
 
 
 /* =========================================================
-   AMOUNT CLASS
+   AMOUNT CLASS BY RESULT
 ========================================================= */
 
-function getAmountClass(
-  amount
+function getAmountClassByResult(
+  result
 ) {
 
-  amount =
-    Number(amount) || 0;
-
-
   if (
-    amount > 0
+    result === "PROFIT"
   ) {
 
     return "text-profit";
@@ -1512,7 +1788,7 @@ function getAmountClass(
 
 
   if (
-    amount < 0
+    result === "RUGI"
   ) {
 
     return "text-loss";
@@ -1618,6 +1894,50 @@ function formatDate(
   }
 
 
+  /*
+   * YYYY-MM-DD
+   */
+
+  const stringValue =
+    String(value);
+
+
+  if (
+    /^\d{4}-\d{2}-\d{2}$/.test(
+      stringValue
+    )
+  ) {
+
+    const parts =
+      stringValue.split("-");
+
+
+    return (
+      parts[2] +
+      "/" +
+      parts[1] +
+      "/" +
+      parts[0]
+    );
+
+  }
+
+
+  /*
+   * DD/MM/YYYY
+   */
+
+  if (
+    /^\d{2}\/\d{2}\/\d{4}$/.test(
+      stringValue
+    )
+  ) {
+
+    return stringValue;
+
+  }
+
+
   const date =
     new Date(value);
 
@@ -1628,25 +1948,7 @@ function formatDate(
     )
   ) {
 
-    /*
-     * Jika Apps Script mengirim
-     * format DD/MM/YYYY.
-     */
-
-    const parts =
-      String(value).split("/");
-
-
-    if (
-      parts.length === 3
-    ) {
-
-      return value;
-
-    }
-
-
-    return String(value);
+    return stringValue;
 
   }
 
@@ -1659,6 +1961,77 @@ function formatDate(
       year: "numeric"
     }
   ).format(date);
+
+}
+
+
+/* =========================================================
+   PARSE DATE VALUE
+========================================================= */
+
+function parseDateValue(
+  value
+) {
+
+  if (!value) {
+    return 0;
+  }
+
+
+  const stringValue =
+    String(value);
+
+
+  /*
+   * YYYY-MM-DD
+   */
+
+  if (
+    /^\d{4}-\d{2}-\d{2}$/.test(
+      stringValue
+    )
+  ) {
+
+    return new Date(
+      stringValue + "T00:00:00"
+    ).getTime();
+
+  }
+
+
+  /*
+   * DD/MM/YYYY
+   */
+
+  const parts =
+    stringValue.split("/");
+
+
+  if (
+    parts.length === 3 &&
+    parts[0].length === 2 &&
+    parts[1].length === 2 &&
+    parts[2].length === 4
+  ) {
+
+    return new Date(
+      Number(parts[2]),
+      Number(parts[1]) - 1,
+      Number(parts[0])
+    ).getTime();
+
+  }
+
+
+  const date =
+    new Date(value);
+
+
+  return Number.isNaN(
+    date.getTime()
+  )
+    ? 0
+    : date.getTime();
 
 }
 
@@ -1686,7 +2059,9 @@ function parseNumber(
     typeof value === "number"
   ) {
 
-    return value;
+    return Number.isFinite(value)
+      ? value
+      : 0;
 
   }
 
@@ -1695,10 +2070,6 @@ function parseNumber(
     String(value)
       .trim();
 
-
-  /*
-   * Hilangkan Rp dan spasi
-   */
 
   stringValue =
     stringValue
@@ -1713,7 +2084,8 @@ function parseNumber(
 
 
   /*
-   * Format Indonesia:
+   * Indonesia:
+   *
    * 8.200
    * 10.000.000
    */
@@ -1733,7 +2105,6 @@ function parseNumber(
 
 
   /*
-   * Format decimal:
    * 8200,5
    */
 
@@ -1756,7 +2127,7 @@ function parseNumber(
 
 
 /* =========================================================
-   GET INPUT VALUE
+   GET VALUE
 ========================================================= */
 
 function getValue(
@@ -1798,7 +2169,7 @@ function setText(
 
 
 /* =========================================================
-   SHOW / HIDE ELEMENT
+   SHOW / HIDE
 ========================================================= */
 
 function showElement(
@@ -1904,6 +2275,11 @@ function showToast(
 
   if (!toast) {
 
+    console[type === "error" ? "error" : "log"](
+      title + ":",
+      message
+    );
+
     return;
 
   }
@@ -1977,7 +2353,7 @@ function showToast(
 
   toastTimer =
     setTimeout(
-      () => {
+      function () {
 
         toast.classList.add(
           "hidden"
@@ -1986,6 +2362,44 @@ function showToast(
       },
       3500
     );
+
+}
+
+
+/* =========================================================
+   API ERROR
+========================================================= */
+
+function getApiErrorMessage(
+  error
+) {
+
+  if (!error) {
+
+    return "Terjadi kesalahan.";
+
+  }
+
+
+  if (
+    typeof error === "string"
+  ) {
+
+    return error;
+
+  }
+
+
+  if (
+    error.message
+  ) {
+
+    return error.message;
+
+  }
+
+
+  return String(error);
 
 }
 
@@ -2024,7 +2438,7 @@ function escapeHtml(
 
 
 /* =========================================================
-   EXPOSE FUNCTIONS
+   EXPOSE PAGE
 ========================================================= */
 
 window.TradingPage = {
