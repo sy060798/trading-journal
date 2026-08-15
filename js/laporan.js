@@ -1,6 +1,7 @@
 /* =========================================================
    TRADING JOURNAL
    laporan.js
+   VERSION UPDATE
 ========================================================= */
 
 "use strict";
@@ -16,6 +17,8 @@ let reportCapital = {};
 let profitChart = null;
 let stockChart = null;
 
+let reportLoading = false;
+
 
 /* =========================================================
    DOM READY
@@ -24,9 +27,7 @@ let stockChart = null;
 document.addEventListener(
   "DOMContentLoaded",
   () => {
-
     initializeReportPage();
-
   }
 );
 
@@ -37,9 +38,9 @@ document.addEventListener(
 
 async function initializeReportPage() {
 
-  setupReportEvents();
-
   setReportDate();
+
+  setupReportEvents();
 
   await loadReportData();
 
@@ -62,7 +63,7 @@ function setupReportEvents() {
 
     refreshButton.addEventListener(
       "click",
-      loadReportData
+      () => loadReportData()
     );
 
   }
@@ -78,7 +79,7 @@ function setupReportEvents() {
 
     filter.addEventListener(
       "change",
-      renderReport
+      () => renderReport()
     );
 
   }
@@ -94,10 +95,92 @@ function setupReportEvents() {
 
     stockFilter.addEventListener(
       "change",
-      renderReport
+      () => renderReport()
     );
 
   }
+
+}
+
+
+/* =========================================================
+   API HELPERS
+========================================================= */
+
+async function getReportTransactionsFromAPI() {
+
+  /*
+   * Prioritas:
+   * TradingAPI dari api.js
+   */
+
+  if (
+    window.TradingAPI &&
+    typeof window.TradingAPI.getTransactions ===
+      "function"
+  ) {
+
+    return await window.TradingAPI.getTransactions();
+
+  }
+
+
+  /*
+   * Fallback untuk api.js lama
+   */
+
+  if (
+    typeof window.getTransactions ===
+    "function"
+  ) {
+
+    return await window.getTransactions();
+
+  }
+
+
+  throw new Error(
+    "Fungsi getTransactions tidak ditemukan. Pastikan api.js sudah dimuat."
+  );
+
+}
+
+
+async function getReportCapitalFromAPI() {
+
+  /*
+   * Prioritas:
+   * TradingAPI dari api.js
+   */
+
+  if (
+    window.TradingAPI &&
+    typeof window.TradingAPI.getCapital ===
+      "function"
+  ) {
+
+    return await window.TradingAPI.getCapital();
+
+  }
+
+
+  /*
+   * Fallback untuk api.js lama
+   */
+
+  if (
+    typeof window.getCapital ===
+    "function"
+  ) {
+
+    return await window.getCapital();
+
+  }
+
+
+  throw new Error(
+    "Fungsi getCapital tidak ditemukan. Pastikan api.js sudah dimuat."
+  );
 
 }
 
@@ -108,6 +191,14 @@ function setupReportEvents() {
 
 async function loadReportData() {
 
+  if (reportLoading) {
+    return;
+  }
+
+
+  reportLoading = true;
+
+
   showReportLoading(
     true
   );
@@ -116,29 +207,120 @@ async function loadReportData() {
   try {
 
     /*
-     * Ambil transaksi dan modal
-     * secara bersamaan.
+     * Ambil transaksi + modal bersamaan.
      */
 
-    const [
-      transactionResult,
-      capitalResult
-    ] = await Promise.all([
-      getTransactions(),
-      getCapital()
-    ]);
+    const results =
+      await Promise.all([
+        getReportTransactionsFromAPI(),
+        getReportCapitalFromAPI()
+      ]);
 
 
-    reportTransactions =
+    const transactionResult =
+      results[0];
+
+
+    const capitalResult =
+      results[1];
+
+
+    /*
+     * Normalisasi transaksi.
+     */
+
+    if (
       Array.isArray(
         transactionResult
       )
-        ? transactionResult
-        : [];
+    ) {
+
+      reportTransactions =
+        transactionResult;
+
+    } else if (
+      transactionResult &&
+      Array.isArray(
+        transactionResult.data
+      )
+    ) {
+
+      reportTransactions =
+        transactionResult.data;
+
+    } else if (
+      transactionResult &&
+      Array.isArray(
+        transactionResult.transactions
+      )
+    ) {
+
+      reportTransactions =
+        transactionResult.transactions;
+
+    } else {
+
+      reportTransactions =
+        [];
+
+    }
 
 
-    reportCapital =
-      capitalResult || {};
+    /*
+     * Normalisasi capital.
+     */
+
+    if (
+      capitalResult &&
+      capitalResult.data &&
+      typeof capitalResult.data ===
+        "object"
+    ) {
+
+      reportCapital =
+        capitalResult.data;
+
+    } else if (
+      capitalResult &&
+      capitalResult.capital &&
+      typeof capitalResult.capital ===
+        "object"
+    ) {
+
+      reportCapital =
+        capitalResult.capital;
+
+    } else if (
+      capitalResult &&
+      typeof capitalResult ===
+        "object"
+    ) {
+
+      reportCapital =
+        capitalResult;
+
+    } else {
+
+      reportCapital =
+        {};
+
+    }
+
+
+    /*
+     * Pastikan array valid.
+     */
+
+    if (
+      !Array.isArray(
+        reportTransactions
+      )
+    ) {
+
+      reportTransactions =
+        [];
+
+    }
 
 
     prepareStockFilter();
@@ -149,16 +331,41 @@ async function loadReportData() {
   } catch (error) {
 
     console.error(
-      "Report error:",
+      "================================="
+    );
+
+    console.error(
+      "REPORT LOAD ERROR"
+    );
+
+    console.error(
       error
+    );
+
+    console.error(
+      "================================="
     );
 
 
     showReportToast(
       "Gagal memuat laporan",
-      getApiErrorMessage(error),
+      getReportErrorMessage(error),
       "error"
     );
+
+
+    /*
+     * Jangan biarkan halaman kosong
+     * tanpa state yang jelas.
+     */
+
+    reportTransactions =
+      [];
+
+    reportCapital =
+      {};
+
+    renderReport();
 
 
   } finally {
@@ -166,6 +373,9 @@ async function loadReportData() {
     showReportLoading(
       false
     );
+
+    reportLoading =
+      false;
 
   }
 
@@ -195,17 +405,21 @@ function renderReport() {
 
   updateCapitalSummary();
 
+
   renderProfitChart(
     filtered
   );
+
 
   renderStockChart(
     filtered
   );
 
+
   renderReportTable(
     filtered
   );
+
 
   updateReportDate();
 
@@ -219,7 +433,11 @@ function renderReport() {
 function getFilteredTransactions() {
 
   let data =
-    [...reportTransactions];
+    Array.isArray(
+      reportTransactions
+    )
+      ? [...reportTransactions]
+      : [];
 
 
   const periodElement =
@@ -245,29 +463,44 @@ function getFilteredTransactions() {
 
 
   /*
-   * Filter saham
+   * FILTER SAHAM
    */
 
   if (
     stock !== "all"
   ) {
 
+    const selectedStock =
+      String(stock)
+        .trim()
+        .toUpperCase();
+
+
     data =
       data.filter(
-        transaction =>
-          String(
-            transaction.saham || ""
-          )
-            .toUpperCase() ===
-          String(stock)
-            .toUpperCase()
+        transaction => {
+
+          const transactionStock =
+            String(
+              transaction?.saham || ""
+            )
+              .trim()
+              .toUpperCase();
+
+
+          return (
+            transactionStock ===
+            selectedStock
+          );
+
+        }
       );
 
   }
 
 
   /*
-   * Filter waktu
+   * FILTER PERIODE
    */
 
   if (
@@ -278,8 +511,20 @@ function getFilteredTransactions() {
       new Date();
 
 
+    const todayStart =
+      new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+        0,
+        0,
+        0,
+        0
+      );
+
+
     let startDate =
-      new Date();
+      null;
 
 
     if (
@@ -287,11 +532,7 @@ function getFilteredTransactions() {
     ) {
 
       startDate =
-        new Date(
-          now.getFullYear(),
-          now.getMonth(),
-          now.getDate()
-        );
+        todayStart;
 
     }
 
@@ -300,8 +541,13 @@ function getFilteredTransactions() {
       period === "7"
     ) {
 
+      startDate =
+        new Date(
+          todayStart
+        );
+
       startDate.setDate(
-        now.getDate() - 6
+        startDate.getDate() - 6
       );
 
     }
@@ -311,8 +557,13 @@ function getFilteredTransactions() {
       period === "30"
     ) {
 
+      startDate =
+        new Date(
+          todayStart
+        );
+
       startDate.setDate(
-        now.getDate() - 29
+        startDate.getDate() - 29
       );
 
     }
@@ -322,8 +573,13 @@ function getFilteredTransactions() {
       period === "90"
     ) {
 
+      startDate =
+        new Date(
+          todayStart
+        );
+
       startDate.setDate(
-        now.getDate() - 89
+        startDate.getDate() - 89
       );
 
     }
@@ -337,30 +593,54 @@ function getFilteredTransactions() {
         new Date(
           now.getFullYear(),
           0,
-          1
+          1,
+          0,
+          0,
+          0,
+          0
         );
 
     }
 
 
-    data =
-      data.filter(
-        transaction => {
+    if (startDate) {
 
-          const date =
-            parseTransactionDate(
-              transaction.tanggal
+      const endDate =
+        new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate(),
+          23,
+          59,
+          59,
+          999
+        );
+
+
+      data =
+        data.filter(
+          transaction => {
+
+            const date =
+              parseTransactionDate(
+                transaction?.tanggal
+              );
+
+
+            if (!date) {
+              return false;
+            }
+
+
+            return (
+              date >= startDate &&
+              date <= endDate
             );
 
+          }
+        );
 
-          return (
-            date &&
-            date >= startDate &&
-            date <= now
-          );
-
-        }
-      );
+    }
 
   }
 
@@ -375,7 +655,7 @@ function getFilteredTransactions() {
 ========================================================= */
 
 function calculateStatistics(
-  transactions
+  data
 ) {
 
   let profit =
@@ -394,53 +674,75 @@ function calculateStatistics(
     0;
 
 
-  transactions.forEach(
+  if (
+    !Array.isArray(data)
+  ) {
+
+    data =
+      [];
+
+  }
+
+
+  data.forEach(
     transaction => {
 
       const amount =
-        Number(
-          transaction.nominal
-        ) || 0;
+        parseReportNumber(
+          transaction?.nominal
+        );
 
 
       const result =
         normalizeReportResult(
-          transaction.hasil
+          transaction?.hasil ??
+          transaction?.profitRugi ??
+          ""
         );
 
-
-      /*
-       * Utamakan nominal.
-       */
 
       totalNominal +=
         amount;
 
 
+      /*
+       * PROFIT
+       */
+
       if (
-        result === "PROFIT" ||
         amount > 0
       ) {
 
         profit +=
-          amount > 0
-            ? amount
-            : 0;
+          amount;
+
+        profitCount++;
+
+      } else if (
+        result === "PROFIT"
+      ) {
 
         profitCount++;
 
       }
 
 
+      /*
+       * RUGI
+       */
+
       if (
-        result === "RUGI" ||
         amount < 0
       ) {
 
         loss +=
-          amount < 0
-            ? Math.abs(amount)
-            : 0;
+          Math.abs(amount);
+
+        lossCount++;
+
+      } else if (
+        result === "RUGI"
+      ) {
 
         lossCount++;
 
@@ -449,12 +751,6 @@ function calculateStatistics(
     }
   );
 
-
-  /*
-   * Jika hasil PROFIT/RUGI
-   * ada tetapi nominal 0,
-   * tetap dihitung jumlahnya.
-   */
 
   const completedTrades =
     profitCount +
@@ -478,7 +774,10 @@ function calculateStatistics(
   return {
 
     totalTransactions:
-      transactions.length,
+      data.length,
+
+    totalNominal:
+      totalNominal,
 
     profit:
       profit,
@@ -569,7 +868,7 @@ function updateSummaryCards(
 
 
   /*
-   * Tambahan ID alternatif
+   * ID alternatif.
    */
 
   setReportText(
@@ -647,7 +946,7 @@ function updateCapitalSummary() {
 
 
   const current =
-    getReportCapitalValue(
+    getReportCapitalValueNullable(
       [
         "modalSekarang",
         "modal_sekarang",
@@ -699,7 +998,7 @@ function updateCapitalSummary() {
 
 
   /*
-   * ID alternatif
+   * ID alternatif.
    */
 
   setReportText(
@@ -717,6 +1016,14 @@ function updateCapitalSummary() {
     )
   );
 
+
+  setReportText(
+    "capitalValue",
+    formatReportRupiah(
+      calculatedCurrent
+    )
+  );
+
 }
 
 
@@ -725,7 +1032,7 @@ function updateCapitalSummary() {
 ========================================================= */
 
 function renderProfitChart(
-  transactions
+  data
 ) {
 
   const canvas =
@@ -744,7 +1051,7 @@ function renderProfitChart(
     "undefined"
   ) {
 
-    console.error(
+    console.warn(
       "Chart.js belum dimuat."
     );
 
@@ -753,9 +1060,31 @@ function renderProfitChart(
   }
 
 
+  if (profitChart) {
+
+    try {
+
+      profitChart.destroy();
+
+    } catch (error) {
+
+      console.warn(
+        "Gagal destroy profit chart:",
+        error
+      );
+
+    }
+
+
+    profitChart =
+      null;
+
+  }
+
+
   const dailyData =
     groupProfitByDate(
-      transactions
+      data
     );
 
 
@@ -772,9 +1101,24 @@ function renderProfitChart(
     );
 
 
-  if (profitChart) {
+  /*
+   * Jika kosong, tetap buat chart
+   * dengan data 0 agar UI tidak rusak.
+   */
 
-    profitChart.destroy();
+  if (
+    labels.length === 0
+  ) {
+
+    labels.push(
+      formatLocalDateKey(
+        new Date()
+      )
+    );
+
+    values.push(
+      0
+    );
 
   }
 
@@ -785,11 +1129,18 @@ function renderProfitChart(
     );
 
 
+  if (!context) {
+    return;
+  }
+
+
   profitChart =
     new Chart(
       context,
       {
-        type: "line",
+
+        type:
+          "line",
 
         data: {
 
@@ -812,7 +1163,7 @@ function renderProfitChart(
                 "#4ade80",
 
               backgroundColor:
-                "rgba(74, 222, 128, 0.10)",
+                "rgba(74,222,128,0.10)",
 
               borderWidth:
                 2,
@@ -870,11 +1221,13 @@ function renderProfitChart(
               callbacks: {
 
                 label:
-                  context =>
+                  context => {
 
-                    formatReportRupiah(
+                    return formatReportRupiah(
                       context.raw
-                    )
+                    );
+
+                  }
 
               }
 
@@ -927,19 +1280,28 @@ function renderProfitChart(
 ========================================================= */
 
 function groupProfitByDate(
-  transactions
+  data
 ) {
 
   const result =
     {};
 
 
-  transactions.forEach(
+  if (
+    !Array.isArray(data)
+  ) {
+
+    return result;
+
+  }
+
+
+  data.forEach(
     transaction => {
 
       const date =
         parseTransactionDate(
-          transaction.tanggal
+          transaction?.tanggal
         );
 
 
@@ -949,17 +1311,15 @@ function groupProfitByDate(
 
 
       const key =
-        date.toISOString()
-          .slice(
-            0,
-            10
-          );
+        formatLocalDateKey(
+          date
+        );
 
 
       const amount =
-        Number(
-          transaction.nominal
-        ) || 0;
+        parseReportNumber(
+          transaction?.nominal
+        );
 
 
       if (
@@ -990,7 +1350,7 @@ function groupProfitByDate(
 ========================================================= */
 
 function renderStockChart(
-  transactions
+  data
 ) {
 
   const canvas =
@@ -1009,7 +1369,33 @@ function renderStockChart(
     "undefined"
   ) {
 
+    console.warn(
+      "Chart.js belum dimuat."
+    );
+
     return;
+
+  }
+
+
+  if (stockChart) {
+
+    try {
+
+      stockChart.destroy();
+
+    } catch (error) {
+
+      console.warn(
+        "Gagal destroy stock chart:",
+        error
+      );
+
+    }
+
+
+    stockChart =
+      null;
 
   }
 
@@ -1018,38 +1404,46 @@ function renderStockChart(
     {};
 
 
-  transactions.forEach(
-    transaction => {
+  if (
+    Array.isArray(data)
+  ) {
 
-      const stock =
-        String(
-          transaction.saham ||
-          "UNKNOWN"
-        )
-          .toUpperCase();
+    data.forEach(
+      transaction => {
+
+        const stock =
+          String(
+            transaction?.saham ||
+            "UNKNOWN"
+          )
+            .trim()
+            .toUpperCase();
 
 
-      const amount =
-        Number(
-          transaction.nominal
-        ) || 0;
+        const amount =
+          parseReportNumber(
+            transaction?.nominal
+          );
 
 
-      if (
-        !stockData[stock]
-      ) {
+        if (
+          stockData[stock] ===
+          undefined
+        ) {
 
-        stockData[stock] =
-          0;
+          stockData[stock] =
+            0;
+
+        }
+
+
+        stockData[stock] +=
+          amount;
 
       }
+    );
 
-
-      stockData[stock] +=
-        amount;
-
-    }
-  );
+  }
 
 
   const sorted =
@@ -1070,23 +1464,34 @@ function renderStockChart(
       );
 
 
-  const labels =
+  let labels =
     sorted.map(
       item =>
         item[0]
     );
 
 
-  const values =
+  let values =
     sorted.map(
       item =>
         item[1]
     );
 
 
-  if (stockChart) {
+  /*
+   * Data kosong.
+   */
 
-    stockChart.destroy();
+  if (
+    labels.length ===
+    0
+  ) {
+
+    labels =
+      ["Belum ada"];
+
+    values =
+      [0];
 
   }
 
@@ -1097,11 +1502,18 @@ function renderStockChart(
     );
 
 
+  if (!context) {
+    return;
+  }
+
+
   stockChart =
     new Chart(
       context,
       {
-        type: "bar",
+
+        type:
+          "bar",
 
         data: {
 
@@ -1157,11 +1569,13 @@ function renderStockChart(
               callbacks: {
 
                 label:
-                  context =>
+                  context => {
 
-                    formatReportRupiah(
+                    return formatReportRupiah(
                       context.raw
-                    )
+                    );
+
+                  }
 
               }
 
@@ -1214,7 +1628,7 @@ function renderStockChart(
 ========================================================= */
 
 function renderReportTable(
-  transactions
+  data
 ) {
 
   const tbody =
@@ -1233,32 +1647,33 @@ function renderReportTable(
 
 
   const sorted =
-    [...transactions]
-      .sort(
-        (
-          a,
-          b
-        ) => {
+    Array.isArray(data)
+      ? [...data].sort(
+          (
+            a,
+            b
+          ) => {
 
-          const dateA =
-            parseTransactionDate(
-              a.tanggal
+            const dateA =
+              parseTransactionDate(
+                a?.tanggal
+              );
+
+
+            const dateB =
+              parseTransactionDate(
+                b?.tanggal
+              );
+
+
+            return (
+              (dateB?.getTime() || 0) -
+              (dateA?.getTime() || 0)
             );
 
-
-          const dateB =
-            parseTransactionDate(
-              b.tanggal
-            );
-
-
-          return (
-            (dateB?.getTime() || 0) -
-            (dateA?.getTime() || 0)
-          );
-
-        }
-      );
+          }
+        )
+      : [];
 
 
   if (
@@ -1304,15 +1719,35 @@ function renderReportTable(
 
 
       const amount =
-        Number(
-          transaction.nominal
-        ) || 0;
+        parseReportNumber(
+          transaction?.nominal
+        );
 
 
       const result =
         normalizeReportResult(
-          transaction.hasil
+          transaction?.hasil ??
+          transaction?.profitRugi ??
+          ""
         );
+
+
+      const stock =
+        transaction?.saham ||
+        "-";
+
+
+      const action =
+        String(
+          transaction?.aksi ||
+          "-"
+        )
+          .toUpperCase();
+
+
+      const note =
+        transaction?.catatan ||
+        "-";
 
 
       row.innerHTML = `
@@ -1320,7 +1755,7 @@ function renderReportTable(
         <td>
           ${escapeReportHtml(
             formatReportDate(
-              transaction.tanggal
+              transaction?.tanggal
             )
           )}
         </td>
@@ -1328,32 +1763,30 @@ function renderReportTable(
         <td>
           <strong>
             ${escapeReportHtml(
-              transaction.saham ||
-              "-"
+              stock
             )}
           </strong>
         </td>
 
         <td>
           <span class="badge ${getReportActionClass(
-            transaction.aksi
+            action
           )}">
             ${escapeReportHtml(
-              transaction.aksi ||
-              "-"
+              action
             )}
           </span>
         </td>
 
         <td>
           ${formatReportRupiah(
-            transaction.harga
+            transaction?.harga
           )}
         </td>
 
         <td>
           ${formatReportNumber(
-            transaction.lot
+            transaction?.lot
           )}
         </td>
 
@@ -1361,17 +1794,23 @@ function renderReportTable(
           ${
             result
               ? `
-                <span class="badge ${getReportResultClass(result)}">
-                  ${escapeReportHtml(result)}
+                <span class="badge ${getReportResultClass(
+                  result
+                )}">
+                  ${escapeReportHtml(
+                    result
+                  )}
                 </span>
               `
               : "-"
           }
         </td>
 
-        <td class="${getReportAmountClass(amount)}">
+        <td class="${getReportAmountClass(
+          amount
+        )}">
           ${
-            amount
+            amount !== 0
               ? formatReportSignedRupiah(
                   amount
                 )
@@ -1381,8 +1820,7 @@ function renderReportTable(
 
         <td>
           ${escapeReportHtml(
-            transaction.catatan ||
-            "-"
+            note
           )}
         </td>
 
@@ -1417,17 +1855,28 @@ function prepareStockFilter() {
 
 
   const currentValue =
-    select.value;
+    String(
+      select.value ||
+      "all"
+    )
+      .trim()
+      .toUpperCase();
 
 
   const stocks =
     [
       ...new Set(
-        reportTransactions
+        (
+          Array.isArray(
+            reportTransactions
+          )
+            ? reportTransactions
+            : []
+        )
           .map(
             transaction =>
               String(
-                transaction.saham ||
+                transaction?.saham ||
                 ""
               )
                 .trim()
@@ -1441,13 +1890,26 @@ function prepareStockFilter() {
       .sort();
 
 
-  select.innerHTML = `
+  select.innerHTML = "";
 
-    <option value="all">
-      Semua Saham
-    </option>
 
-  `;
+  const allOption =
+    document.createElement(
+      "option"
+    );
+
+
+  allOption.value =
+    "all";
+
+
+  allOption.textContent =
+    "Semua Saham";
+
+
+  select.appendChild(
+    allOption
+  );
 
 
   stocks.forEach(
@@ -1476,6 +1938,14 @@ function prepareStockFilter() {
 
 
   if (
+    currentValue ===
+    "ALL"
+  ) {
+
+    select.value =
+      "all";
+
+  } else if (
     stocks.includes(
       currentValue
     )
@@ -1483,6 +1953,11 @@ function prepareStockFilter() {
 
     select.value =
       currentValue;
+
+  } else {
+
+    select.value =
+      "all";
 
   }
 
@@ -1543,10 +2018,6 @@ function updateReportDate() {
   }
 
 
-  const now =
-    new Date();
-
-
   element.textContent =
     "Update " +
     new Intl.DateTimeFormat(
@@ -1568,14 +2039,14 @@ function updateReportDate() {
           "2-digit"
       }
     ).format(
-      now
+      new Date()
     );
 
 }
 
 
 /* =========================================================
-   PARSE DATE
+   PARSE TRANSACTION DATE
 ========================================================= */
 
 function parseTransactionDate(
@@ -1587,15 +2058,42 @@ function parseTransactionDate(
   }
 
 
-  /*
-   * Date object
-   */
-
   if (
     value instanceof Date
   ) {
 
-    return value;
+    return Number.isNaN(
+      value.getTime()
+    )
+      ? null
+      : value;
+
+  }
+
+
+  /*
+   * Apps Script kadang mengirim
+   * tanggal sebagai object/string.
+   */
+
+  if (
+    typeof value ===
+    "object"
+  ) {
+
+    if (
+      value.$date
+    ) {
+
+      value =
+        value.$date;
+
+    } else {
+
+      value =
+        String(value);
+
+    }
 
   }
 
@@ -1620,7 +2118,11 @@ function parseTransactionDate(
     return new Date(
       Number(match[3]),
       Number(match[2]) - 1,
-      Number(match[1])
+      Number(match[1]),
+      12,
+      0,
+      0,
+      0
     );
 
   }
@@ -1641,7 +2143,36 @@ function parseTransactionDate(
     return new Date(
       Number(match[1]),
       Number(match[2]) - 1,
-      Number(match[3])
+      Number(match[3]),
+      12,
+      0,
+      0,
+      0
+    );
+
+  }
+
+
+  /*
+   * MM/DD/YYYY
+   */
+
+  match =
+    stringValue.match(
+      /^(\d{1,2})-(\d{1,2})-(\d{4})$/
+    );
+
+
+  if (match) {
+
+    return new Date(
+      Number(match[3]),
+      Number(match[1]) - 1,
+      Number(match[2]),
+      12,
+      0,
+      0,
+      0
     );
 
   }
@@ -1663,6 +2194,43 @@ function parseTransactionDate(
 
 
 /* =========================================================
+   LOCAL DATE KEY
+========================================================= */
+
+function formatLocalDateKey(
+  date
+) {
+
+  const year =
+    date.getFullYear();
+
+
+  const month =
+    String(
+      date.getMonth() + 1
+    ).padStart(
+      2,
+      "0"
+    );
+
+
+  const day =
+    String(
+      date.getDate()
+    ).padStart(
+      2,
+      "0"
+    );
+
+
+  return (
+    `${year}-${month}-${day}`
+  );
+
+}
+
+
+/* =========================================================
    FORMAT DATE
 ========================================================= */
 
@@ -1677,9 +2245,11 @@ function formatReportDate(
 
 
   if (!date) {
+
     return String(
       value || "-"
     );
+
   }
 
 
@@ -1738,6 +2308,102 @@ function formatChartDate(
 
 
 /* =========================================================
+   PARSE NUMBER
+========================================================= */
+
+function parseReportNumber(
+  value
+) {
+
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+
+    return 0;
+
+  }
+
+
+  if (
+    typeof value ===
+    "number"
+  ) {
+
+    return Number.isFinite(value)
+      ? value
+      : 0;
+
+  }
+
+
+  let stringValue =
+    String(value)
+      .trim();
+
+
+  /*
+   * Hapus Rp.
+   */
+
+  stringValue =
+    stringValue
+      .replace(
+        /Rp/gi,
+        ""
+      )
+      .replace(
+        /\s/g,
+        ""
+      );
+
+
+  /*
+   * Angka Indonesia:
+   * 10.000.000
+   */
+
+  if (
+    stringValue.includes(".") &&
+    !stringValue.includes(",")
+  ) {
+
+    stringValue =
+      stringValue.replace(
+        /\./g,
+        ""
+      );
+
+  }
+
+
+  /*
+   * Decimal:
+   * 1000,50
+   */
+
+  stringValue =
+    stringValue.replace(
+      /,/g,
+      "."
+    );
+
+
+  const number =
+    Number(
+      stringValue
+    );
+
+
+  return Number.isFinite(number)
+    ? number
+    : 0;
+
+}
+
+
+/* =========================================================
    FORMAT RUPIAH
 ========================================================= */
 
@@ -1758,7 +2424,9 @@ function formatReportRupiah(
         0
     }
   ).format(
-    Number(value) || 0
+    parseReportNumber(
+      value
+    )
   );
 
 }
@@ -1773,17 +2441,21 @@ function formatReportSignedRupiah(
 ) {
 
   const number =
-    Number(value) || 0;
+    parseReportNumber(
+      value
+    );
 
 
   if (
     number > 0
   ) {
 
-    return "+" +
+    return (
+      "+" +
       formatReportRupiah(
         number
-      );
+      )
+    );
 
   }
 
@@ -1792,10 +2464,12 @@ function formatReportSignedRupiah(
     number < 0
   ) {
 
-    return "-" +
+    return (
+      "-" +
       formatReportRupiah(
         Math.abs(number)
-      );
+      )
+    );
 
   }
 
@@ -1816,7 +2490,9 @@ function formatCompactRupiah(
 ) {
 
   const number =
-    Number(value) || 0;
+    parseReportNumber(
+      value
+    );
 
 
   const absolute =
@@ -1829,8 +2505,10 @@ function formatCompactRupiah(
 
     return (
       "Rp " +
-      (number / 1000000000)
-        .toFixed(1) +
+      (
+        number /
+        1000000000
+      ).toFixed(1) +
       "M"
     );
 
@@ -1843,8 +2521,10 @@ function formatCompactRupiah(
 
     return (
       "Rp " +
-      (number / 1000000)
-        .toFixed(1) +
+      (
+        number /
+        1000000
+      ).toFixed(1) +
       "jt"
     );
 
@@ -1857,8 +2537,10 @@ function formatCompactRupiah(
 
     return (
       "Rp " +
-      (number / 1000)
-        .toFixed(0) +
+      (
+        number /
+        1000
+      ).toFixed(0) +
       "rb"
     );
 
@@ -1884,7 +2566,9 @@ function formatReportNumber(
   return new Intl.NumberFormat(
     "id-ID"
   ).format(
-    Number(value) || 0
+    parseReportNumber(
+      value
+    )
   );
 
 }
@@ -1898,12 +2582,43 @@ function getReportCapitalValue(
   keys
 ) {
 
+  const value =
+    getReportCapitalValueNullable(
+      keys
+    );
+
+
+  return value === null
+    ? 0
+    : value;
+
+}
+
+
+/* =========================================================
+   CAPITAL VALUE NULLABLE
+========================================================= */
+
+function getReportCapitalValueNullable(
+  keys
+) {
+
+  if (
+    !reportCapital ||
+    typeof reportCapital !==
+      "object"
+  ) {
+
+    return null;
+
+  }
+
+
   for (
     const key of keys
   ) {
 
     if (
-      reportCapital &&
       reportCapital[key] !==
         undefined &&
       reportCapital[key] !==
@@ -1913,33 +2628,25 @@ function getReportCapitalValue(
     ) {
 
       const value =
-        Number(
+        parseReportNumber(
           reportCapital[key]
         );
 
 
-      if (
-        Number.isFinite(
-          value
-        )
-      ) {
-
-        return value;
-
-      }
+      return value;
 
     }
 
   }
 
 
-  return 0;
+  return null;
 
 }
 
 
 /* =========================================================
-   RESULT
+   NORMALIZE RESULT
 ========================================================= */
 
 function normalizeReportResult(
@@ -2000,7 +2707,9 @@ function getReportActionClass(
   const value =
     String(
       action || ""
-    ).toUpperCase();
+    )
+      .trim()
+      .toUpperCase();
 
 
   if (
@@ -2066,7 +2775,9 @@ function getReportAmountClass(
 ) {
 
   const value =
-    Number(amount) || 0;
+    parseReportNumber(
+      amount
+    );
 
 
   if (
@@ -2154,6 +2865,47 @@ function showReportLoading(
 
 
 /* =========================================================
+   ERROR MESSAGE
+========================================================= */
+
+function getReportErrorMessage(
+  error
+) {
+
+  if (!error) {
+
+    return "Terjadi kesalahan.";
+
+  }
+
+
+  if (
+    typeof error ===
+    "string"
+  ) {
+
+    return error;
+
+  }
+
+
+  if (
+    error.message
+  ) {
+
+    return error.message;
+
+  }
+
+
+  return String(
+    error
+  );
+
+}
+
+
+/* =========================================================
    TOAST
 ========================================================= */
 
@@ -2164,25 +2916,9 @@ function showReportToast(
 ) {
 
   /*
-   * Jika trading.js juga tersedia,
-   * gunakan toast yang sama.
+   * Gunakan TradingAPI error helper
+   * bila tersedia.
    */
-
-  if (
-    typeof window.showToast ===
-    "function"
-  ) {
-
-    window.showToast(
-      title,
-      message,
-      type
-    );
-
-    return;
-
-  }
-
 
   const toast =
     document.getElementById(
@@ -2193,8 +2929,7 @@ function showReportToast(
   if (!toast) {
 
     console.log(
-      title,
-      message
+      `[${type}] ${title}: ${message}`
     );
 
     return;
@@ -2214,6 +2949,12 @@ function showReportToast(
     );
 
 
+  const icon =
+    document.getElementById(
+      "toastIcon"
+    );
+
+
   if (titleElement) {
 
     titleElement.textContent =
@@ -2226,6 +2967,28 @@ function showReportToast(
 
     messageElement.textContent =
       message;
+
+  }
+
+
+  if (icon) {
+
+    icon.textContent =
+      type === "error"
+        ? "!"
+        : "✓";
+
+
+    icon.style.background =
+      type === "error"
+        ? "rgba(239,68,68,.12)"
+        : "rgba(34,197,94,.12)";
+
+
+    icon.style.color =
+      type === "error"
+        ? "#f87171"
+        : "#4ade80";
 
   }
 
@@ -2294,6 +3057,12 @@ window.TradingReport = {
   refresh:
     loadReportData,
 
+  render:
+    renderReport,
+
+  getFilteredTransactions:
+    getFilteredTransactions,
+
   getStatistics:
     () =>
       calculateStatistics(
@@ -2301,3 +3070,11 @@ window.TradingReport = {
       )
 
 };
+
+
+/* =========================================================
+   GLOBAL SHORTCUT
+========================================================= */
+
+window.reloadTradingReport =
+  loadReportData;
