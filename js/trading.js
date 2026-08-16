@@ -1,15 +1,15 @@
 /* =========================================================
    TRADING JOURNAL
    js/trading.js
-   STAGE 1 / 2
 
-   FUNGSI:
+   TAHAP 1 / 2
    - Load data
    - Summary
    - Tabel transaksi
    - Tambah transaksi
-   - Tambah modal
-   - Tarik modal
+   - Edit transaksi
+   - Delete transaksi
+   - Modal
    - Loading
    - Toast
 ========================================================= */
@@ -60,7 +60,6 @@ async function initTradingPage() {
     "[Trading] Initializing..."
   );
 
-
   setupDefaultDates();
 
   setupProfitField();
@@ -71,9 +70,13 @@ async function initTradingPage() {
 
   setupModalForms();
 
+  setupTableActions();
+
   setupCloseModal();
 
   setupKeyboardEvents();
+
+  createCancelEditButton();
 
   await loadTradingData();
 
@@ -155,28 +158,58 @@ async function loadTradingData() {
 
   try {
 
-    const data =
+    const result =
       await TradingAPI.getAllData();
+
+
+    /*
+     * Support jika API mengembalikan:
+     *
+     * {
+     *   transaksi: [],
+     *   modal: [],
+     *   summary: {}
+     * }
+     *
+     * atau:
+     *
+     * {
+     *   data: {
+     *     transaksi: []
+     *   }
+     * }
+     */
+
+    const data =
+      result &&
+      result.data &&
+      typeof result.data === "object"
+        ? result.data
+        : result;
 
 
     TradingState.transaksi =
       Array.isArray(
-        data.transaksi
+        data?.transaksi
       )
         ? data.transaksi
-        : [];
+        : Array.isArray(
+            data?.transactions
+          )
+            ? data.transactions
+            : [];
 
 
     TradingState.modal =
       Array.isArray(
-        data.modal
+        data?.modal
       )
         ? data.modal
         : [];
 
 
     TradingState.summary =
-      data.summary &&
+      data?.summary &&
       typeof data.summary === "object"
         ? data.summary
         : {};
@@ -217,9 +250,9 @@ async function loadTradingData() {
 
 
     showToast(
+      getErrorMessage(error),
       "error",
-      "Gagal memuat",
-      getErrorMessage(error)
+      "Gagal"
     );
 
 
@@ -329,7 +362,9 @@ function renderSummary() {
 
     profitIcon.classList.remove(
       "profit-positive",
-      "profit-negative"
+      "profit-negative",
+      "positive",
+      "negative"
     );
 
 
@@ -361,10 +396,6 @@ function renderSummary() {
   }
 
 
-  /*
-   * Warna nilai profit/loss.
-   */
-
   const profitValue =
     document.getElementById(
       "profitLossValue"
@@ -375,14 +406,17 @@ function renderSummary() {
 
     profitValue.classList.remove(
       "profit-positive",
-      "profit-negative"
+      "profit-negative",
+      "positive",
+      "negative"
     );
 
 
     if (netProfit > 0) {
 
       profitValue.classList.add(
-        "profit-positive"
+        "profit-positive",
+        "positive"
       );
 
     }
@@ -391,7 +425,8 @@ function renderSummary() {
     if (netProfit < 0) {
 
       profitValue.classList.add(
-        "profit-negative"
+        "profit-negative",
+        "negative"
       );
 
     }
@@ -509,7 +544,7 @@ function renderTransactions() {
 
 
   /*
-   * Ambil maksimal transaksi terbaru.
+   * Ambil maksimal 10 transaksi terbaru.
    */
 
   const recent =
@@ -541,6 +576,82 @@ function renderTransactions() {
 
 
 /* =========================================================
+   NORMALIZE TRANSACTION
+========================================================= */
+
+function normalizeTransaction(
+  transaction
+) {
+
+  if (
+    !transaction ||
+    typeof transaction !== "object"
+  ) {
+
+    return {};
+
+  }
+
+
+  return {
+
+    id:
+      transaction.ID ??
+      transaction.id ??
+      "",
+
+    tanggal:
+      transaction.Tanggal ??
+      transaction.tanggal ??
+      "",
+
+    saham:
+      transaction.Saham ??
+      transaction.saham ??
+      "",
+
+    aksi:
+      transaction.Aksi ??
+      transaction.aksi ??
+      "",
+
+    harga:
+      transaction.Harga ??
+      transaction.harga ??
+      0,
+
+    lot:
+      transaction.Lot ??
+      transaction.lot ??
+      0,
+
+    profitRugi:
+      transaction["Profit/Rugi"] ??
+      transaction.profitRugi ??
+      transaction.hasil ??
+      "",
+
+    nominal:
+      transaction.Nominal ??
+      transaction.nominal ??
+      0,
+
+    catatan:
+      transaction.Catatan ??
+      transaction.catatan ??
+      "",
+
+    timestamp:
+      transaction.Timestamp ??
+      transaction.timestamp ??
+      ""
+
+  };
+
+}
+
+
+/* =========================================================
    CREATE TRANSACTION ROW
 ========================================================= */
 
@@ -554,71 +665,49 @@ function createTransactionRow(
     );
 
 
-  const id =
-    getTransactionId(
+  const normalized =
+    normalizeTransaction(
       transaction
     );
 
 
-  const tanggal =
-    getField(
-      transaction,
-      "Tanggal",
-      "tanggal"
+  const id =
+    String(
+      normalized.id || ""
     );
+
+
+  const tanggal =
+    normalized.tanggal;
 
 
   const saham =
-    getField(
-      transaction,
-      "Saham",
-      "saham"
-    );
+    normalized.saham;
 
 
   const aksi =
-    getField(
-      transaction,
-      "Aksi",
-      "aksi"
-    );
+    normalized.aksi;
 
 
   const harga =
     toNumber(
-      getField(
-        transaction,
-        "Harga",
-        "harga"
-      )
+      normalized.harga
     );
 
 
   const lot =
     toNumber(
-      getField(
-        transaction,
-        "Lot",
-        "lot"
-      )
+      normalized.lot
     );
 
 
   const hasil =
-    getField(
-      transaction,
-      "Profit/Rugi",
-      "profitRugi"
-    );
+    normalized.profitRugi;
 
 
   const nominal =
     toNumber(
-      getField(
-        transaction,
-        "Nominal",
-        "nominal"
-      )
+      normalized.nominal
     );
 
 
@@ -673,6 +762,7 @@ function createTransactionRow(
       <button
         type="button"
         class="table-action-button edit-transaction-button"
+        data-action="edit"
         data-id="${escapeAttribute(id)}"
       >
         Edit
@@ -681,6 +771,7 @@ function createTransactionRow(
       <button
         type="button"
         class="table-action-button delete-transaction-button"
+        data-action="delete"
         data-id="${escapeAttribute(id)}"
       >
         Hapus
@@ -689,50 +780,6 @@ function createTransactionRow(
     </td>
 
   `;
-
-
-  const editButton =
-    row.querySelector(
-      ".edit-transaction-button"
-    );
-
-
-  const deleteButton =
-    row.querySelector(
-      ".delete-transaction-button"
-    );
-
-
-  if (editButton) {
-
-    editButton.addEventListener(
-      "click",
-      function () {
-
-        handleEditTransaction(
-          id
-        );
-
-      }
-    );
-
-  }
-
-
-  if (deleteButton) {
-
-    deleteButton.addEventListener(
-      "click",
-      function () {
-
-        handleDeleteTransaction(
-          id
-        );
-
-      }
-    );
-
-  }
 
 
   return row;
@@ -835,7 +882,7 @@ function createResultBadge(
   if (value === "PROFIT") {
 
     return `
-      <span class="result-badge result-profit">
+      <span class="result-badge result-profit profit">
         PROFIT
       </span>
     `;
@@ -846,7 +893,7 @@ function createResultBadge(
   if (value === "RUGI") {
 
     return `
-      <span class="result-badge result-loss">
+      <span class="result-badge result-loss loss">
         RUGI
       </span>
     `;
@@ -875,24 +922,111 @@ function getActionClass(
     String(
       aksi || ""
     )
+    .trim()
     .toUpperCase();
 
 
   if (value === "BUY") {
 
-    return "action-buy";
+    return "action-buy buy";
 
   }
 
 
   if (value === "SELL") {
 
-    return "action-sell";
+    return "action-sell sell";
 
   }
 
 
   return "";
+
+}
+
+
+/* =========================================================
+   TABLE ACTION SETUP
+========================================================= */
+
+function setupTableActions() {
+
+  const tbody =
+    document.getElementById(
+      "transactionTableBody"
+    );
+
+
+  if (!tbody) {
+
+    return;
+
+  }
+
+
+  tbody.addEventListener(
+    "click",
+    function (event) {
+
+      const button =
+        event.target.closest(
+          "[data-action]"
+        );
+
+
+      if (!button) {
+
+        return;
+
+      }
+
+
+      const action =
+        button.dataset.action;
+
+
+      const id =
+        button.dataset.id;
+
+
+      if (!id) {
+
+        showToast(
+          "ID transaksi tidak ditemukan.",
+          "error",
+          "Gagal"
+        );
+
+        return;
+
+      }
+
+
+      if (
+        action === "edit"
+      ) {
+
+        handleEditTransaction(
+          id
+        );
+
+        return;
+
+      }
+
+
+      if (
+        action === "delete"
+      ) {
+
+        handleDeleteTransaction(
+          id
+        );
+
+      }
+
+    }
+  );
 
 }
 
@@ -922,7 +1056,6 @@ function setupTransactionForm() {
 
       event.preventDefault();
 
-
       await handleTransactionSubmit(
         form
       );
@@ -934,20 +1067,12 @@ function setupTransactionForm() {
 
 
 /* =========================================================
-   SUBMIT TRANSACTION
+   GET TRANSACTION FORM DATA
 ========================================================= */
 
-async function handleTransactionSubmit(
-  form
-) {
+function getTransactionFormData() {
 
-  const button =
-    document.getElementById(
-      "saveTransactionButton"
-    );
-
-
-  const data = {
+  return {
 
     tanggal:
       getInputValue(
@@ -994,57 +1119,163 @@ async function handleTransactionSubmit(
 
   };
 
+}
+
+
+/* =========================================================
+   SUBMIT TRANSACTION
+========================================================= */
+
+async function handleTransactionSubmit(
+  form
+) {
+
+  const button =
+    document.getElementById(
+      "saveTransactionButton"
+    );
+
+
+  /*
+   * Validasi HTML form.
+   */
+
+  if (
+    form &&
+    typeof form.checkValidity === "function" &&
+    !form.checkValidity()
+  ) {
+
+    form.reportValidity();
+
+    return;
+
+  }
+
+
+  const data =
+    getTransactionFormData();
+
+
+  /*
+   * =====================================================
+   * PERBAIKAN PENTING
+   *
+   * Saat EDIT, ID dimasukkan ke payload.
+   *
+   * Ini untuk mengantisipasi api.js yang membaca:
+   *
+   * data.id
+   *
+   * bukan hanya parameter id.
+   * =====================================================
+   */
+
+  if (
+    TradingState.editingId
+  ) {
+
+    data.id =
+      String(
+        TradingState.editingId
+      );
+
+  }
+
 
   try {
 
     setButtonLoading(
       button,
       true,
-      "Menyimpan..."
+      TradingState.editingId
+        ? "Mengubah..."
+        : "Menyimpan..."
     );
 
 
+    let result;
+
+
     /*
-     * Kalau sedang edit.
+     * EDIT
      */
 
     if (
       TradingState.editingId
     ) {
 
-      await TradingAPI.updateTransaction(
-        TradingState.editingId,
+      console.log(
+        "[Trading] Updating transaction:",
+        {
+          id:
+            TradingState.editingId,
+
+          data:
+            data
+        }
+      );
+
+
+      result =
+        await TradingAPI.updateTransaction(
+          TradingState.editingId,
+          data
+        );
+
+
+      showToast(
+        result?.message ||
+        "Transaksi berhasil diperbarui.",
+        "success",
+        "Berhasil"
+      );
+
+
+    }
+
+
+    /*
+     * TAMBAH
+     */
+
+    else {
+
+      console.log(
+        "[Trading] Adding transaction:",
         data
       );
 
 
-      showToast(
-        "success",
-        "Berhasil",
-        "Transaksi berhasil diperbarui."
-      );
-
-
-    } else {
-
-      await TradingAPI.addTransaction(
-        data
-      );
+      result =
+        await TradingAPI.addTransaction(
+          data
+        );
 
 
       showToast(
+        result?.message ||
+        "Transaksi berhasil disimpan.",
         "success",
-        "Berhasil",
-        "Transaksi berhasil disimpan."
+        "Berhasil"
       );
 
     }
 
 
-    resetTransactionForm();
+    /*
+     * Reset state edit
+     */
 
     TradingState.editingId =
       null;
+
+
+    resetTransactionForm();
+
+    setTransactionEditMode(
+      false
+    );
 
 
     await loadTradingData();
@@ -1059,9 +1290,9 @@ async function handleTransactionSubmit(
 
 
     showToast(
+      getErrorMessage(error),
       "error",
-      "Gagal",
-      getErrorMessage(error)
+      "Gagal"
     );
 
 
@@ -1089,9 +1320,9 @@ function handleEditTransaction(
   if (!id) {
 
     showToast(
+      "ID transaksi tidak ditemukan.",
       "error",
-      "Gagal",
-      "ID transaksi tidak ditemukan."
+      "Gagal"
     );
 
     return;
@@ -1119,9 +1350,9 @@ function handleEditTransaction(
   if (!transaction) {
 
     showToast(
+      "Data transaksi tidak ditemukan.",
       "error",
-      "Gagal",
-      "Data transaksi tidak ditemukan."
+      "Gagal"
     );
 
     return;
@@ -1129,16 +1360,34 @@ function handleEditTransaction(
   }
 
 
-  TradingState.editingId =
-    id;
+  /*
+   * =====================================================
+   * SIMPAN ID EDIT
+   * =====================================================
+   */
 
+  TradingState.editingId =
+    String(id);
+
+
+  console.log(
+    "[Trading] Enter edit mode:",
+    TradingState.editingId
+  );
+
+
+  /*
+   * Isi form.
+   */
 
   setInputValue(
     "tanggal",
-    getField(
-      transaction,
-      "Tanggal",
-      "tanggal"
+    convertDateForInput(
+      getField(
+        transaction,
+        "Tanggal",
+        "tanggal"
+      )
     )
   );
 
@@ -1216,33 +1465,12 @@ function handleEditTransaction(
   updateNominalVisibility();
 
 
-  const button =
-    document.getElementById(
-      "saveTransactionButton"
-    );
+  setTransactionEditMode(
+    true
+  );
 
 
-  if (button) {
-
-    const span =
-      button.querySelector(
-        "span:first-child"
-      );
-
-
-    if (span) {
-
-      span.textContent =
-        "Update Transaksi";
-
-    } else {
-
-      button.textContent =
-        "Update Transaksi";
-
-    }
-
-  }
+  updateCancelEditButton();
 
 
   const panel =
@@ -1251,9 +1479,20 @@ function handleEditTransaction(
     );
 
 
-  if (panel) {
+  const form =
+    document.getElementById(
+      "transactionForm"
+    );
 
-    panel.scrollIntoView({
+
+  const scrollTarget =
+    panel ||
+    form;
+
+
+  if (scrollTarget) {
+
+    scrollTarget.scrollIntoView({
       behavior: "smooth",
       block: "start"
     });
@@ -1262,1265 +1501,86 @@ function handleEditTransaction(
 
 
   showToast(
+    "Silakan ubah data transaksi lalu tekan Update Transaksi.",
     "success",
-    "Mode Edit",
-    "Silakan ubah data transaksi."
+    "Mode Edit"
   );
 
 }
 
-
 /* =========================================================
-   DELETE TRANSACTION
+   TRADING JOURNAL
+   js/trading.js
+   STAGE 2 / FINAL
+
+   FIX:
+   - EDIT menggunakan TradingState.editingId
+   - Tidak menggunakan editingTransactionId terpisah
+   - Tidak bentrok dengan Stage 1
+   - ADD tetap jalan
+   - EDIT tetap jalan
+   - DELETE tetap jalan
+   - MODAL tetap jalan
+   - REFRESH tetap jalan
 ========================================================= */
 
-async function handleDeleteTransaction(
-  id
-) {
-
-  if (!id) {
-
-    showToast(
-      "error",
-      "Gagal",
-      "ID transaksi tidak ditemukan."
-    );
-
-    return;
-
-  }
+"use strict";
 
 
-  const transaction =
-    TradingState.transaksi.find(
-      function (item) {
+/* =========================================================
+   DOM HELPER
+========================================================= */
 
-        return (
-          String(
-            getTransactionId(
-              item
-            )
-          ) ===
-          String(id)
-        );
+function el(id) {
 
-      }
-    );
-
-
-  const saham =
-    transaction
-      ? getField(
-          transaction,
-          "Saham",
-          "saham"
-        )
-      : "transaksi ini";
-
-
-  const confirmed =
-    window.confirm(
-      "Hapus transaksi " +
-      saham +
-      "?\n\nData yang dihapus tidak dapat dikembalikan."
-    );
-
-
-  if (!confirmed) {
-
-    return;
-
-  }
-
-
-  try {
-
-    setLoading(
-      true,
-      "Menghapus transaksi..."
-    );
-
-
-    await TradingAPI.deleteTransaction(
-      id
-    );
-
-
-    showToast(
-      "success",
-      "Berhasil",
-      "Transaksi berhasil dihapus."
-    );
-
-
-    await loadTradingData();
-
-
-  } catch (error) {
-
-    console.error(
-      "[Trading] Delete error:",
-      error
-    );
-
-
-    showToast(
-      "error",
-      "Gagal menghapus",
-      getErrorMessage(error)
-    );
-
-
-  } finally {
-
-    setLoading(
-      false
-    );
-
-  }
+  return document.getElementById(id);
 
 }
 
 
 /* =========================================================
-   RESET FORM
+   FORMAT RUPIAH
 ========================================================= */
 
-function resetTransactionForm() {
-
-  const form =
-    document.getElementById(
-      "transactionForm"
-    );
-
-
-  if (form) {
-
-    form.reset();
-
-  }
-
-
-  TradingState.editingId =
-    null;
-
-
-  setInputValue(
-    "tanggal",
-    getTodayString()
-  );
-
-
-  setInputValue(
-    "profitRugi",
-    ""
-  );
-
-
-  updateNominalVisibility();
-
-
-  const button =
-    document.getElementById(
-      "saveTransactionButton"
-    );
-
-
-  if (button) {
-
-    const span =
-      button.querySelector(
-        "span:first-child"
-      );
-
-
-    if (span) {
-
-      span.textContent =
-        "Simpan Transaksi";
-
-    }
-
-  }
-
-}
-
-
-/* =========================================================
-   PROFIT FIELD
-========================================================= */
-
-function setupProfitField() {
-
-  const select =
-    document.getElementById(
-      "profitRugi"
-    );
-
-
-  if (!select) {
-
-    return;
-
-  }
-
-
-  select.addEventListener(
-    "change",
-    updateNominalVisibility
-  );
-
-
-  updateNominalVisibility();
-
-}
-
-
-/* =========================================================
-   NOMINAL VISIBILITY
-========================================================= */
-
-function updateNominalVisibility() {
-
-  const select =
-    document.getElementById(
-      "profitRugi"
-    );
-
-
-  const group =
-    document.getElementById(
-      "nominalGroup"
-    );
-
-
-  const input =
-    document.getElementById(
-      "nominal"
-    );
-
-
-  if (!select) {
-
-    return;
-
-  }
-
-
-  const value =
-    String(
-      select.value || ""
-    )
-    .toUpperCase();
-
-
-  const hasResult =
-    value === "PROFIT" ||
-    value === "RUGI";
-
-
-  if (group) {
-
-    if (hasResult) {
-
-      group.classList.remove(
-        "hidden"
-      );
-
-    } else {
-
-      group.classList.add(
-        "hidden"
-      );
-
-    }
-
-  }
-
-
-  if (input) {
-
-    input.required =
-      hasResult;
-
-
-    if (!hasResult) {
-
-      input.value =
-        "";
-
-    }
-
-  }
-
-}
-
-
-/* =========================================================
-   MODAL BUTTONS
-========================================================= */
-
-function setupModalButtons() {
-
-  const addButton =
-    document.getElementById(
-      "addModalButton"
-    );
-
-
-  const withdrawButton =
-    document.getElementById(
-      "withdrawModalButton"
-    );
-
-
-  if (addButton) {
-
-    addButton.addEventListener(
-      "click",
-      function () {
-
-        openModal(
-          "addModal"
-        );
-
-      }
-    );
-
-  }
-
-
-  if (withdrawButton) {
-
-    withdrawButton.addEventListener(
-      "click",
-      function () {
-
-        openModal(
-          "withdrawModal"
-        );
-
-      }
-    );
-
-  }
-
-}
-
-
-/* =========================================================
-   MODAL FORMS
-========================================================= */
-
-function setupModalForms() {
-
-  const addForm =
-    document.getElementById(
-      "addModalForm"
-    );
-
-
-  const withdrawForm =
-    document.getElementById(
-      "withdrawModalForm"
-    );
-
-
-  if (addForm) {
-
-    addForm.addEventListener(
-      "submit",
-      async function (event) {
-
-        event.preventDefault();
-
-        await handleAddCapital(
-          addForm
-        );
-
-      }
-    );
-
-  }
-
-
-  if (withdrawForm) {
-
-    withdrawForm.addEventListener(
-      "submit",
-      async function (event) {
-
-        event.preventDefault();
-
-        await handleWithdrawCapital(
-          withdrawForm
-        );
-
-      }
-    );
-
-  }
-
-}
-
-
-/* =========================================================
-   ADD CAPITAL
-========================================================= */
-
-async function handleAddCapital(
-  form
-) {
-
-  const button =
-    document.getElementById(
-      "saveAddModalButton"
-    );
-
-
-  const tanggal =
-    getInputValue(
-      "addModalTanggal"
-    );
-
-
-  const nominal =
-    getInputNumber(
-      "addModalNominal"
-    );
-
-
-  const catatan =
-    getInputValue(
-      "addModalCatatan"
-    );
-
-
-  try {
-
-    setButtonLoading(
-      button,
-      true,
-      "Menyimpan..."
-    );
-
-
-    await TradingAPI.addCapital(
-      nominal,
-      catatan,
-      tanggal
-    );
-
-
-    closeAllModals();
-
-    form.reset();
-
-
-    setInputValue(
-      "addModalTanggal",
-      getTodayString()
-    );
-
-
-    showToast(
-      "success",
-      "Berhasil",
-      "Modal berhasil ditambahkan."
-    );
-
-
-    await loadTradingData();
-
-
-  } catch (error) {
-
-    console.error(
-      "[Trading] Add capital error:",
-      error
-    );
-
-
-    showToast(
-      "error",
-      "Gagal",
-      getErrorMessage(error)
-    );
-
-
-  } finally {
-
-    setButtonLoading(
-      button,
-      false,
-      "Simpan"
-    );
-
-  }
-
-}
-
-
-/* =========================================================
-   WITHDRAW CAPITAL
-========================================================= */
-
-async function handleWithdrawCapital(
-  form
-) {
-
-  const button =
-    document.getElementById(
-      "saveWithdrawModalButton"
-    );
-
-
-  const tanggal =
-    getInputValue(
-      "withdrawModalTanggal"
-    );
-
-
-  const nominal =
-    getInputNumber(
-      "withdrawModalNominal"
-    );
-
-
-  const catatan =
-    getInputValue(
-      "withdrawModalCatatan"
-    );
-
-
-  try {
-
-    setButtonLoading(
-      button,
-      true,
-      "Memproses..."
-    );
-
-
-    await TradingAPI.withdrawCapital(
-      nominal,
-      catatan,
-      tanggal
-    );
-
-
-    closeAllModals();
-
-    form.reset();
-
-
-    setInputValue(
-      "withdrawModalTanggal",
-      getTodayString()
-    );
-
-
-    showToast(
-      "success",
-      "Berhasil",
-      "Modal berhasil ditarik."
-    );
-
-
-    await loadTradingData();
-
-
-  } catch (error) {
-
-    console.error(
-      "[Trading] Withdraw capital error:",
-      error
-    );
-
-
-    showToast(
-      "error",
-      "Gagal",
-      getErrorMessage(error)
-    );
-
-
-  } finally {
-
-    setButtonLoading(
-      button,
-      false,
-      "Tarik Modal"
-    );
-
-  }
-
-}
-
-
-/* =========================================================
-   OPEN MODAL
-========================================================= */
-
-function openModal(
-  id
-) {
-
-  const modal =
-    document.getElementById(
-      id
-    );
-
-
-  if (!modal) {
-
-    return;
-
-  }
-
-
-  modal.classList.remove(
-    "hidden"
-  );
-
-
-  document.body.classList.add(
-    "modal-open"
-  );
-
-
-  if (
-    id === "addModal"
-  ) {
-
-    setInputValue(
-      "addModalTanggal",
-      getTodayString()
-    );
-
-  }
-
-
-  if (
-    id === "withdrawModal"
-  ) {
-
-    setInputValue(
-      "withdrawModalTanggal",
-      getTodayString()
-    );
-
-  }
-
-}
-
-
-/* =========================================================
-   CLOSE MODAL
-========================================================= */
-
-function closeModal(
-  id
-) {
-
-  const modal =
-    document.getElementById(
-      id
-    );
-
-
-  if (!modal) {
-
-    return;
-
-  }
-
-
-  modal.classList.add(
-    "hidden"
-  );
-
-
-  const openModals =
-    document.querySelectorAll(
-      ".modal-overlay:not(.hidden)"
-    );
-
-
-  if (
-    openModals.length === 0
-  ) {
-
-    document.body.classList.remove(
-      "modal-open"
-    );
-
-  }
-
-}
-
-
-/* =========================================================
-   CLOSE ALL
-========================================================= */
-
-function closeAllModals() {
-
-  document
-    .querySelectorAll(
-      ".modal-overlay"
-    )
-    .forEach(
-      function (modal) {
-
-        modal.classList.add(
-          "hidden"
-        );
-
-      }
-    );
-
-
-  document.body.classList.remove(
-    "modal-open"
-  );
-
-}
-
-
-/* =========================================================
-   CLOSE EVENTS
-========================================================= */
-
-function setupCloseModal() {
-
-  document
-    .querySelectorAll(
-      "[data-close-modal]"
-    )
-    .forEach(
-      function (button) {
-
-        button.addEventListener(
-          "click",
-          function () {
-
-            const modal =
-              button.closest(
-                ".modal-overlay"
-              );
-
-
-            if (modal) {
-
-              closeModal(
-                modal.id
-              );
-
-            }
-
-          }
-        );
-
-      }
-    );
-
-
-  document
-    .querySelectorAll(
-      ".modal-overlay"
-    )
-    .forEach(
-      function (overlay) {
-
-        overlay.addEventListener(
-          "click",
-          function (event) {
-
-            if (
-              event.target ===
-              overlay
-            ) {
-
-              closeModal(
-                overlay.id
-              );
-
-            }
-
-          }
-        );
-
-      }
-    );
-
-}
-
-
-/* =========================================================
-   KEYBOARD
-========================================================= */
-
-function setupKeyboardEvents() {
-
-  document.addEventListener(
-    "keydown",
-    function (event) {
-
-      if (
-        event.key === "Escape"
-      ) {
-
-        closeAllModals();
-
-      }
-
-    }
-  );
-
-}
-
-
-/* =========================================================
-   LOADING
-========================================================= */
-
-function setLoading(
-  active,
-  message = "Memuat..."
-) {
-
-  TradingState.loading =
-    active;
-
-
-  const loading =
-    document.getElementById(
-      "transactionLoading"
-    );
-
-
-  const loadingText =
-    loading
-      ? loading.querySelector(
-          "span"
-        )
-      : null;
-
-
-  if (active) {
-
-    if (loading) {
-
-      loading.classList.remove(
-        "hidden"
-      );
-
-    }
-
-
-    if (loadingText) {
-
-      loadingText.textContent =
-        message;
-
-    }
-
-  } else {
-
-    if (loading) {
-
-      loading.classList.add(
-        "hidden"
-      );
-
-    }
-
-  }
-
-
-  /*
-   * Global loading jika tersedia.
-   */
-
-  const global =
-    document.getElementById(
-      "globalLoading"
-    );
-
-
-  const globalText =
-    document.getElementById(
-      "globalLoadingText"
-    );
-
-
-  if (global) {
-
-    if (active) {
-
-      global.classList.remove(
-        "hidden"
-      );
-
-    } else {
-
-      global.classList.add(
-        "hidden"
-      );
-
-    }
-
-  }
-
-
-  if (
-    globalText &&
-    active
-  ) {
-
-    globalText.textContent =
-      message;
-
-  }
-
-}
-
-
-/* =========================================================
-   BUTTON LOADING
-========================================================= */
-
-function setButtonLoading(
-  button,
-  loading,
-  text
-) {
-
-  if (!button) {
-
-    return;
-
-  }
-
-
-  if (loading) {
-
-    button.disabled =
-      true;
-
-
-    button.dataset.originalText =
-      button.textContent;
-
-
-    button.textContent =
-      text;
-
-  } else {
-
-    button.disabled =
-      false;
-
-
-    button.textContent =
-      text ||
-      button.dataset.originalText ||
-      "Simpan";
-
-  }
-
-}
-
-
-/* =========================================================
-   TOAST
-========================================================= */
-
-function showToast(
-  type,
-  title,
-  message
-) {
-
-  const toast =
-    document.getElementById(
-      "toast"
-    );
-
-
-  const toastIcon =
-    document.getElementById(
-      "toastIcon"
-    );
-
-
-  const toastTitle =
-    document.getElementById(
-      "toastTitle"
-    );
-
-
-  const toastMessage =
-    document.getElementById(
-      "toastMessage"
-    );
-
-
-  if (!toast) {
-
-    console.log(
-      title + ": " + message
-    );
-
-    return;
-
-  }
-
-
-  toast.classList.remove(
-    "hidden",
-    "toast-success",
-    "toast-error"
-  );
-
-
-  if (
-    type === "error"
-  ) {
-
-    toast.classList.add(
-      "toast-error"
-    );
-
-    if (toastIcon) {
-
-      toastIcon.textContent =
-        "×";
-
-    }
-
-  } else {
-
-    toast.classList.add(
-      "toast-success"
-    );
-
-    if (toastIcon) {
-
-      toastIcon.textContent =
-        "✓";
-
-    }
-
-  }
-
-
-  if (toastTitle) {
-
-    toastTitle.textContent =
-      title;
-
-  }
-
-
-  if (toastMessage) {
-
-    toastMessage.textContent =
-      message;
-
-  }
-
-
-  clearTimeout(
-    window.__tradingToastTimer
-  );
-
-
-  window.__tradingToastTimer =
-    setTimeout(
-      function () {
-
-        toast.classList.add(
-          "hidden"
-        );
-
-      },
-      4000
-    );
-
-}
-
-
-/* =========================================================
-   HELPERS
-========================================================= */
-
-function getInputValue(
-  id
-) {
-
-  const element =
-    document.getElementById(
-      id
-    );
-
-
-  if (!element) {
-
-    return "";
-
-  }
-
-
-  return String(
-    element.value || ""
-  ).trim();
-
-}
-
-
-function getInputNumber(
-  id
-) {
-
-  const value =
-    getInputValue(
-      id
-    );
-
-
-  if (!value) {
-
-    return 0;
-
-  }
-
+function formatRupiahFinal(value) {
 
   const number =
-    Number(
-      value
-    );
+    Number(value) || 0;
 
 
-  return Number.isFinite(
-    number
-  )
-    ? number
-    : 0;
-
-}
-
-
-function setInputValue(
-  id,
-  value
-) {
-
-  const element =
-    document.getElementById(
-      id
-    );
-
-
-  if (element) {
-
-    element.value =
-      value ??
-      "";
-
-  }
+  return new Intl.NumberFormat(
+    "id-ID",
+    {
+      style: "currency",
+      currency: "IDR",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }
+  ).format(number);
 
 }
 
 
-function setText(
-  id,
-  value
-) {
+/* =========================================================
+   FORMAT NUMBER
+========================================================= */
 
-  const element =
-    document.getElementById(
-      id
-    );
-
-
-  if (element) {
-
-    element.textContent =
-      value;
-
-  }
-
-}
-
-
-function toNumber(
-  value
-) {
-
-  if (
-    value === null ||
-    value === undefined ||
-    value === ""
-  ) {
-
-    return 0;
-
-  }
-
-
-  const number =
-    Number(
-      String(value)
-        .replace(
-          /[^\d.-]/g,
-          ""
-        )
-    );
-
-
-  return Number.isFinite(
-    number
-  )
-    ? number
-    : 0;
-
-}
-
-
-function formatNumber(
-  value
-) {
+function formatNumberFinal(value) {
 
   return new Intl.NumberFormat(
     "id-ID"
   ).format(
-    toNumber(value)
+    Number(value) || 0
   );
 
 }
 
 
-function formatRupiah(
-  value
-) {
+/* =========================================================
+   FORMAT DATE
+========================================================= */
 
-  return (
-    "Rp" +
-    new Intl.NumberFormat(
-      "id-ID"
-    ).format(
-      toNumber(value)
-    )
-  );
-
-}
-
-
-function formatDisplayDate(
-  value
-) {
+function formatTanggalFinal(value) {
 
   if (!value) {
 
@@ -2529,19 +1589,22 @@ function formatDisplayDate(
   }
 
 
-  const string =
-    String(value)
-      .trim();
+  const text =
+    String(value).trim();
 
+
+  /*
+   * YYYY-MM-DD
+   */
 
   if (
     /^\d{4}-\d{2}-\d{2}$/.test(
-      string
+      text
     )
   ) {
 
     const parts =
-      string.split("-");
+      text.split("-");
 
 
     return (
@@ -2555,125 +1618,16 @@ function formatDisplayDate(
   }
 
 
-  return string;
+  return text;
 
 }
 
 
-function getField(
-  object,
-  primary,
-  secondary
-) {
+/* =========================================================
+   TODAY
+========================================================= */
 
-  if (
-    object &&
-    object[primary] !== undefined
-  ) {
-
-    return object[primary];
-
-  }
-
-
-  if (
-    object &&
-    object[secondary] !== undefined
-  ) {
-
-    return object[secondary];
-
-  }
-
-
-  return "";
-
-}
-
-
-function getTransactionId(
-  transaction
-) {
-
-  return getField(
-    transaction,
-    "ID",
-    "id"
-  );
-
-}
-
-
-function getErrorMessage(
-  error
-) {
-
-  if (!error) {
-
-    return "Terjadi kesalahan.";
-
-  }
-
-
-  if (
-    error.message
-  ) {
-
-    return error.message;
-
-  }
-
-
-  return String(
-    error
-  );
-
-}
-
-
-function escapeHtml(
-  value
-) {
-
-  return String(
-    value ?? ""
-  )
-  .replace(
-    /&/g,
-    "&amp;"
-  )
-  .replace(
-    /</g,
-    "&lt;"
-  )
-  .replace(
-    />/g,
-    "&gt;"
-  )
-  .replace(
-    /"/g,
-    "&quot;"
-  )
-  .replace(
-    /'/g,
-    "&#039;"
-  );
-
-}
-
-
-function escapeAttribute(
-  value
-) {
-
-  return escapeHtml(
-    value
-  );
-
-}
-
-
-function getTodayString() {
+function todayStringFinal() {
 
   const now =
     new Date();
@@ -2701,405 +1655,22 @@ function getTodayString() {
 
 
 /* =========================================================
-   GLOBAL FUNCTIONS
+   NORMALIZE TRANSACTION
 ========================================================= */
 
-window.TradingPage = {
-
-  load:
-    loadTradingData,
-
-  refresh:
-    refreshTradingData,
-
-  edit:
-    handleEditTransaction,
-
-  remove:
-    handleDeleteTransaction,
-
-  openModal:
-    openModal,
-
-  closeModal:
-    closeModal,
-
-  closeAllModals:
-    closeAllModals
-
-};
-
-
-console.log(
-  "[Trading] Stage 1 loaded."
-);
-
-/* =========================================================
-   TRADING JOURNAL
-   trading.js
-   STAGE 2 / FINAL
-   EDIT + DELETE + MODAL + REFRESH + UI
-========================================================= */
-
-"use strict";
-
-
-/* =========================================================
-   STATE
-========================================================= */
-
-let editingTransactionId = null;
-
-
-/* =========================================================
-   DOM HELPER
-========================================================= */
-
-function el(id) {
-  return document.getElementById(id);
-}
-
-
-/* =========================================================
-   ESCAPE HTML
-========================================================= */
-
-function escapeHtml(value) {
-
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-
-}
-
-
-/* =========================================================
-   FORMAT RUPIAH
-========================================================= */
-
-function formatRupiah(value) {
-
-  const number = Number(value) || 0;
-
-  return new Intl.NumberFormat(
-    "id-ID",
-    {
-      style: "currency",
-      currency: "IDR",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }
-  ).format(number);
-
-}
-
-
-/* =========================================================
-   FORMAT NUMBER
-========================================================= */
-
-function formatNumber(value) {
-
-  return new Intl.NumberFormat(
-    "id-ID"
-  ).format(
-    Number(value) || 0
-  );
-
-}
-
-
-/* =========================================================
-   FORMAT DATE
-========================================================= */
-
-function formatTanggal(value) {
-
-  if (!value) {
-    return "-";
-  }
-
-  const text = String(value);
-
-  /*
-   * YYYY-MM-DD
-   */
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
-
-    const parts = text.split("-");
-
-    return (
-      parts[2] +
-      "/" +
-      parts[1] +
-      "/" +
-      parts[0]
-    );
-
-  }
-
-  /*
-   * Jika sudah tanggal lain,
-   * coba Date.
-   */
-
-  const date = new Date(value);
-
-  if (!isNaN(date.getTime())) {
-
-    return new Intl.DateTimeFormat(
-      "id-ID",
-      {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric"
-      }
-    ).format(date);
-
-  }
-
-  return escapeHtml(value);
-
-}
-
-
-/* =========================================================
-   TODAY
-========================================================= */
-
-function todayString() {
-
-  const now = new Date();
-
-  return (
-    now.getFullYear() +
-    "-" +
-    String(
-      now.getMonth() + 1
-    ).padStart(2, "0") +
-    "-" +
-    String(
-      now.getDate()
-    ).padStart(2, "0")
-  );
-
-}
-
-
-/* =========================================================
-   SET INPUT TODAY
-========================================================= */
-
-function setDefaultDates() {
-
-  const today = todayString();
-
-  const tanggal = el("tanggal");
-  const addTanggal = el("addModalTanggal");
-  const withdrawTanggal = el("withdrawModalTanggal");
-
-  if (tanggal && !tanggal.value) {
-    tanggal.value = today;
-  }
-
-  if (addTanggal && !addTanggal.value) {
-    addTanggal.value = today;
-  }
-
-  if (withdrawTanggal && !withdrawTanggal.value) {
-    withdrawTanggal.value = today;
-  }
-
-}
-
-
-/* =========================================================
-   SHOW GLOBAL LOADING
-========================================================= */
-
-function showLoading(message = "Memproses...") {
-
-  const loading = el("globalLoading");
-  const text = el("globalLoadingText");
-
-  if (text) {
-    text.textContent = message;
-  }
-
-  if (loading) {
-    loading.classList.remove("hidden");
-  }
-
-}
-
-
-/* =========================================================
-   HIDE GLOBAL LOADING
-========================================================= */
-
-function hideLoading() {
-
-  const loading = el("globalLoading");
-
-  if (loading) {
-    loading.classList.add("hidden");
-  }
-
-}
-
-
-/* =========================================================
-   SHOW TOAST
-========================================================= */
-
-let toastTimer = null;
-
-function showToast(
-  message,
-  type = "success",
-  title = ""
+function normalizeTransactionFinal(
+  row
 ) {
 
-  const toast = el("toast");
-  const toastIcon = el("toastIcon");
-  const toastTitle = el("toastTitle");
-  const toastMessage = el("toastMessage");
+  if (
+    !row ||
+    typeof row !== "object"
+  ) {
 
-  if (!toast) {
-    return;
-  }
-
-  if (!title) {
-
-    title =
-      type === "error"
-        ? "Gagal"
-        : type === "warning"
-          ? "Peringatan"
-          : "Berhasil";
-
-  }
-
-  if (toastTitle) {
-    toastTitle.textContent = title;
-  }
-
-  if (toastMessage) {
-    toastMessage.textContent = message;
-  }
-
-  if (toastIcon) {
-
-    toastIcon.textContent =
-      type === "error"
-        ? "!"
-        : type === "warning"
-          ? "!"
-          : "✓";
-
-  }
-
-  toast.classList.remove(
-    "hidden",
-    "success",
-    "error",
-    "warning"
-  );
-
-  toast.classList.add(type);
-
-  clearTimeout(toastTimer);
-
-  toastTimer = setTimeout(
-    function () {
-
-      toast.classList.add("hidden");
-
-    },
-    3500
-  );
-
-}
-
-
-/* =========================================================
-   CLOSE TOAST
-========================================================= */
-
-function hideToast() {
-
-  const toast = el("toast");
-
-  if (toast) {
-    toast.classList.add("hidden");
-  }
-
-}
-
-
-/* =========================================================
-   OPEN MODAL
-========================================================= */
-
-function openModal(id) {
-
-  const modal = el(id);
-
-  if (!modal) {
-    return;
-  }
-
-  modal.classList.remove("hidden");
-
-  document.body.classList.add("modal-open");
-
-}
-
-
-/* =========================================================
-   CLOSE MODAL
-========================================================= */
-
-function closeModal(id) {
-
-  const modal = el(id);
-
-  if (!modal) {
-    return;
-  }
-
-  modal.classList.add("hidden");
-
-  document.body.classList.remove("modal-open");
-
-}
-
-
-/* =========================================================
-   CLOSE ALL MODAL
-========================================================= */
-
-function closeAllModals() {
-
-  closeModal("addModal");
-  closeModal("withdrawModal");
-
-}
-
-
-/* =========================================================
-   NORMALIZE ROW
-========================================================= */
-
-function normalizeRow(row) {
-
-  if (!row || typeof row !== "object") {
     return {};
+
   }
+
 
   return {
 
@@ -3160,617 +1731,313 @@ function normalizeRow(row) {
 
 
 /* =========================================================
-   GET TRANSACTION DATA
+   GET DATA DARI API
 ========================================================= */
 
-async function loadTransactions() {
+async function getTradingDataFinal() {
 
-  setTransactionLoading(true);
+  const result =
+    await TradingAPI.getAllData();
+
+
+  /*
+   * API bisa mengembalikan:
+   *
+   * {
+   *   transaksi: [...]
+   * }
+   *
+   * atau:
+   *
+   * {
+   *   data: {
+   *     transaksi: [...]
+   *   }
+   * }
+   */
+
+  return (
+    result?.data ||
+    result ||
+    {}
+  );
+
+}
+
+
+/* =========================================================
+   LOAD TRANSACTIONS
+========================================================= */
+
+async function loadTransactionsFinal() {
 
   try {
 
-    const result =
-      await TradingAPI.getAllData();
+    setLoading(
+      true,
+      "Memuat data trading..."
+    );
+
 
     const data =
-      result?.data ||
-      result ||
-      {};
+      await getTradingDataFinal();
+
 
     const transaksi =
-      Array.isArray(data.transaksi)
+      Array.isArray(
+        data.transaksi
+      )
         ? data.transaksi
-        : Array.isArray(data.transactions)
+        : Array.isArray(
+            data.transactions
+          )
           ? data.transactions
           : [];
 
-    renderTransactions(transaksi);
 
-    renderSummary(
-      data.summary || {}
-    );
+    TradingState.transaksi =
+      transaksi;
+
+
+    TradingState.summary =
+      data.summary &&
+      typeof data.summary === "object"
+        ? data.summary
+        : {};
+
+
+    /*
+     * Gunakan renderer Stage 1.
+     */
+
+    renderSummary();
+
+    renderTransactions();
+
 
   } catch (error) {
 
     console.error(
-      "[Trading] loadTransactions:",
+      "[Trading] loadTransactionsFinal:",
       error
     );
 
-    renderTransactions([]);
+
+    TradingState.transaksi =
+      [];
+
+    TradingState.summary =
+      {};
+
+
+    renderSummary();
+
+    renderTransactions();
+
 
     showToast(
-      error.message ||
-      "Gagal mengambil data dari Google Sheets.",
-      "error"
+      "error",
+      "Gagal",
+      getErrorMessage(error)
     );
+
 
   } finally {
 
-    setTransactionLoading(false);
-
-  }
-
-}
-
-
-/* =========================================================
-   LOADING TRANSACTION STATE
-========================================================= */
-
-function setTransactionLoading(isLoading) {
-
-  const loading =
-    el("transactionLoading");
-
-  const empty =
-    el("transactionEmpty");
-
-  const table =
-    el("transactionTableWrapper");
-
-  if (isLoading) {
-
-    if (loading) {
-      loading.classList.remove("hidden");
-    }
-
-    if (empty) {
-      empty.classList.add("hidden");
-    }
-
-    if (table) {
-      table.classList.add("hidden");
-    }
-
-    return;
-
-  }
-
-  if (loading) {
-    loading.classList.add("hidden");
-  }
-
-}
-
-
-/* =========================================================
-   RENDER TRANSACTIONS
-========================================================= */
-
-function renderTransactions(
-  transactions
-) {
-
-  const tbody =
-    el("transactionTableBody");
-
-  const empty =
-    el("transactionEmpty");
-
-  const table =
-    el("transactionTableWrapper");
-
-  if (!tbody) {
-    return;
-  }
-
-  tbody.innerHTML = "";
-
-  if (
-    !Array.isArray(transactions) ||
-    transactions.length === 0
-  ) {
-
-    if (empty) {
-      empty.classList.remove("hidden");
-    }
-
-    if (table) {
-      table.classList.add("hidden");
-    }
-
-    return;
-
-  }
-
-  /*
-   * Terbaru di atas.
-   */
-
-  const rows =
-    [...transactions]
-      .reverse();
-
-  rows.forEach(
-    function(raw) {
-
-      const row =
-        normalizeRow(raw);
-
-      const tr =
-        document.createElement("tr");
-
-      const hasil =
-        String(
-          row.profitRugi || ""
-        ).toUpperCase();
-
-      let hasilClass = "";
-
-      if (hasil === "PROFIT") {
-        hasilClass = "profit";
-      }
-
-      if (hasil === "RUGI") {
-        hasilClass = "loss";
-      }
-
-      const aksi =
-        String(row.aksi || "")
-          .toUpperCase();
-
-      const aksiClass =
-        aksi === "BUY"
-          ? "buy"
-          : aksi === "SELL"
-            ? "sell"
-            : "";
-
-      tr.innerHTML = `
-
-        <td>
-          ${escapeHtml(
-            formatTanggal(row.tanggal)
-          )}
-        </td>
-
-        <td>
-          <strong>
-            ${escapeHtml(row.saham)}
-          </strong>
-        </td>
-
-        <td>
-          <span class="trade-badge ${aksiClass}">
-            ${escapeHtml(aksi)}
-          </span>
-        </td>
-
-        <td>
-          ${formatNumber(row.harga)}
-        </td>
-
-        <td>
-          ${formatNumber(row.lot)}
-        </td>
-
-        <td>
-          ${
-            hasil
-              ? `
-                <span class="result-badge ${hasilClass}">
-                  ${escapeHtml(hasil)}
-                </span>
-              `
-              : "-"
-          }
-        </td>
-
-        <td>
-          ${
-            hasil
-              ? formatRupiah(row.nominal)
-              : "-"
-          }
-        </td>
-
-        <td class="transaction-actions">
-
-          <button
-            type="button"
-            class="table-action edit"
-            data-action="edit"
-            data-id="${escapeHtml(row.id)}"
-          >
-            Edit
-          </button>
-
-          <button
-            type="button"
-            class="table-action delete"
-            data-action="delete"
-            data-id="${escapeHtml(row.id)}"
-          >
-            Hapus
-          </button>
-
-        </td>
-
-      `;
-
-      tbody.appendChild(tr);
-
-    }
-  );
-
-  if (empty) {
-    empty.classList.add("hidden");
-  }
-
-  if (table) {
-    table.classList.remove("hidden");
-  }
-
-}
-
-
-/* =========================================================
-   RENDER SUMMARY
-========================================================= */
-
-function renderSummary(summary) {
-
-  if (!summary) {
-    summary = {};
-  }
-
-  const modal =
-    Number(summary.modal) || 0;
-
-  const netProfit =
-    Number(summary.netProfit) || 0;
-
-  const total =
-    Number(summary.total) ||
-    modal + netProfit;
-
-  const modalValue =
-    el("modalValue");
-
-  const profitLossValue =
-    el("profitLossValue");
-
-  const totalValue =
-    el("totalValue");
-
-  const profitDescription =
-    el("profitLossDescription");
-
-  const profitIcon =
-    el("profitIcon");
-
-  if (modalValue) {
-    modalValue.textContent =
-      formatRupiah(modal);
-  }
-
-  if (profitLossValue) {
-
-    profitLossValue.textContent =
-      formatRupiah(netProfit);
-
-    profitLossValue.classList.remove(
-      "positive",
-      "negative"
+    setLoading(
+      false
     );
 
-    if (netProfit > 0) {
-      profitLossValue.classList.add(
-        "positive"
-      );
-    }
-
-    if (netProfit < 0) {
-      profitLossValue.classList.add(
-        "negative"
-      );
-    }
-
-  }
-
-  if (totalValue) {
-    totalValue.textContent =
-      formatRupiah(total);
-  }
-
-  if (profitDescription) {
-
-    if (netProfit > 0) {
-
-      profitDescription.textContent =
-        "Trading menghasilkan profit";
-
-    } else if (netProfit < 0) {
-
-      profitDescription.textContent =
-        "Trading mengalami kerugian";
-
-    } else {
-
-      profitDescription.textContent =
-        "Net hasil trading";
-
-    }
-
-  }
-
-  if (profitIcon) {
-
-    profitIcon.textContent =
-      netProfit >= 0
-        ? "↗"
-        : "↘";
-
   }
 
 }
 
 
 /* =========================================================
-   READ TRANSACTION FORM
+   FIND TRANSACTION BY ID
 ========================================================= */
 
-function getTransactionFormData() {
+async function findTransactionByIdFinal(
+  id
+) {
 
-  const data = {
+  if (!id) {
+
+    return null;
+
+  }
+
+
+  /*
+   * Cari dulu dari state.
+   */
+
+  const local =
+    Array.isArray(
+      TradingState.transaksi
+    )
+      ? TradingState.transaksi.find(
+          function (item) {
+
+            return (
+              String(
+                getTransactionId(
+                  item
+                )
+              ) ===
+              String(id)
+            );
+
+          }
+        )
+      : null;
+
+
+  if (local) {
+
+    return normalizeTransactionFinal(
+      local
+    );
+
+  }
+
+
+  /*
+   * Kalau tidak ada,
+   * ambil ulang dari API.
+   */
+
+  const data =
+    await getTradingDataFinal();
+
+
+  const transactions =
+    Array.isArray(
+      data.transaksi
+    )
+      ? data.transaksi
+      : Array.isArray(
+          data.transactions
+        )
+        ? data.transactions
+        : [];
+
+
+  return (
+    transactions
+      .map(
+        normalizeTransactionFinal
+      )
+      .find(
+        function (row) {
+
+          return (
+            String(row.id) ===
+            String(id)
+          );
+
+        }
+      ) ||
+    null
+  );
+
+}
+
+
+/* =========================================================
+   READ FORM
+========================================================= */
+
+function getTransactionFormDataFinal() {
+
+  return {
 
     tanggal:
-      el("tanggal")?.value || "",
+      getInputValue(
+        "tanggal"
+      ),
 
     saham:
-      el("saham")?.value || "",
+      getInputValue(
+        "saham"
+      ).toUpperCase(),
 
     aksi:
-      el("aksi")?.value || "",
+      getInputValue(
+        "aksi"
+      ).toUpperCase(),
 
     harga:
-      Number(
-        el("harga")?.value || 0
+      getInputNumber(
+        "harga"
       ),
 
     lot:
-      Number(
-        el("lot")?.value || 0
+      getInputNumber(
+        "lot"
       ),
 
     profitRugi:
-      el("profitRugi")?.value || "",
+      getInputValue(
+        "profitRugi"
+      ).toUpperCase(),
 
     nominal:
-      Number(
-        el("nominal")?.value || 0
+      getInputNumber(
+        "nominal"
       ),
 
     catatan:
-      el("catatan")?.value || ""
+      getInputValue(
+        "catatan"
+      )
 
   };
 
-  return data;
-
 }
 
 
 /* =========================================================
-   CLEAR TRANSACTION FORM
+   SET EDIT BUTTON
 ========================================================= */
 
-function clearTransactionForm() {
-
-  const form =
-    el("transactionForm");
-
-  if (form) {
-    form.reset();
-  }
-
-  const tanggal =
-    el("tanggal");
-
-  if (tanggal) {
-    tanggal.value =
-      todayString();
-  }
-
-  const aksi =
-    el("aksi");
-
-  if (aksi) {
-    aksi.value = "BUY";
-  }
-
-  const profitRugi =
-    el("profitRugi");
-
-  if (profitRugi) {
-    profitRugi.value = "";
-  }
-
-  updateNominalVisibility();
-
-}
-
-
-/* =========================================================
-   NOMINAL VISIBILITY
-========================================================= */
-
-function updateNominalVisibility() {
-
-  const select =
-    el("profitRugi");
-
-  const group =
-    el("nominalGroup");
-
-  const nominal =
-    el("nominal");
-
-  if (!select || !group) {
-    return;
-  }
-
-  const hasResult =
-    select.value === "PROFIT" ||
-    select.value === "RUGI";
-
-  if (hasResult) {
-
-    group.classList.remove("hidden");
-
-    if (nominal) {
-      nominal.required = true;
-    }
-
-  } else {
-
-    group.classList.add("hidden");
-
-    if (nominal) {
-
-      nominal.required = false;
-      nominal.value = "";
-
-    }
-
-  }
-
-}
-
-
-/* =========================================================
-   SAVE TRANSACTION
-========================================================= */
-
-async function handleTransactionSubmit(event) {
-
-  event.preventDefault();
-
-  const form =
-    event.currentTarget;
-
-  if (
-    form &&
-    !form.checkValidity()
-  ) {
-
-    form.reportValidity();
-
-    return;
-
-  }
-
-  try {
-
-    const data =
-      getTransactionFormData();
-
-    showLoading(
-      editingTransactionId
-        ? "Mengubah transaksi..."
-        : "Menyimpan transaksi..."
-    );
-
-    let result;
-
-    if (editingTransactionId) {
-
-      result =
-        await TradingAPI.updateTransaction(
-          editingTransactionId,
-          data
-        );
-
-    } else {
-
-      result =
-        await TradingAPI.addTransaction(
-          data
-        );
-
-    }
-
-    console.log(
-      "[Trading] save result:",
-      result
-    );
-
-    editingTransactionId = null;
-
-    clearTransactionForm();
-
-    setTransactionEditMode(false);
-
-    await loadTransactions();
-
-    showToast(
-      result?.message ||
-      "Transaksi berhasil disimpan.",
-      "success"
-    );
-
-  } catch (error) {
-
-    console.error(
-      "[Trading] save transaction:",
-      error
-    );
-
-    showToast(
-      error.message ||
-      "Gagal menyimpan transaksi.",
-      "error"
-    );
-
-  } finally {
-
-    hideLoading();
-
-  }
-
-}
-
-
-/* =========================================================
-   EDIT MODE
-========================================================= */
-
-function setTransactionEditMode(isEdit) {
+function setTransactionEditModeFinal(
+  isEdit
+) {
 
   const button =
-    el("saveTransactionButton");
+    document.getElementById(
+      "saveTransactionButton"
+    );
+
 
   if (!button) {
+
     return;
+
   }
 
+
+  /*
+   * Stage 1 menggunakan span:first-child.
+   */
+
   const span =
-    button.querySelector("span");
+    button.querySelector(
+      "span:first-child"
+    );
+
 
   if (span) {
 
     span.textContent =
+      isEdit
+        ? "Update Transaksi"
+        : "Simpan Transaksi";
+
+  } else {
+
+    button.textContent =
       isEdit
         ? "Update Transaksi"
         : "Simpan Transaksi";
@@ -3781,63 +2048,39 @@ function setTransactionEditMode(isEdit) {
 
 
 /* =========================================================
-   FIND TRANSACTION
+   START EDIT TRANSACTION
 ========================================================= */
 
-async function findTransactionById(id) {
-
-  const result =
-    await TradingAPI.getAllData();
-
-  const data =
-    result?.data ||
-    result ||
-    {};
-
-  const transactions =
-    Array.isArray(data.transaksi)
-      ? data.transaksi
-      : [];
-
-  return transactions
-    .map(normalizeRow)
-    .find(
-      function(row) {
-
-        return String(row.id) ===
-          String(id);
-
-      }
-    );
-
-}
-
-
-/* =========================================================
-   START EDIT
-========================================================= */
-
-async function startEditTransaction(id) {
+async function startEditTransactionFinal(
+  id
+) {
 
   if (!id) {
 
     showToast(
-      "ID transaksi tidak ditemukan.",
-      "error"
+      "error",
+      "Gagal",
+      "ID transaksi tidak ditemukan."
     );
 
     return;
 
   }
 
+
   try {
 
-    showLoading(
+    setLoading(
+      true,
       "Memuat transaksi..."
     );
 
+
     const row =
-      await findTransactionById(id);
+      await findTransactionByIdFinal(
+        id
+      );
+
 
     if (!row) {
 
@@ -3847,57 +2090,99 @@ async function startEditTransaction(id) {
 
     }
 
-    editingTransactionId =
-      id;
 
-    if (el("tanggal")) {
-      el("tanggal").value =
-        convertDateForInput(
-          row.tanggal
-        );
-    }
+    /*
+     * =====================================================
+     * INI BAGIAN PALING PENTING
+     *
+     * Jangan pakai editingTransactionId.
+     *
+     * State edit harus masuk ke:
+     *
+     * TradingState.editingId
+     * =====================================================
+     */
 
-    if (el("saham")) {
-      el("saham").value =
-        row.saham || "";
-    }
+    TradingState.editingId =
+      String(row.id);
 
-    if (el("aksi")) {
-      el("aksi").value =
-        row.aksi || "BUY";
-    }
 
-    if (el("harga")) {
-      el("harga").value =
-        row.harga || "";
-    }
+    console.log(
+      "[Trading] EDIT ID:",
+      TradingState.editingId
+    );
 
-    if (el("lot")) {
-      el("lot").value =
-        row.lot || "";
-    }
 
-    if (el("profitRugi")) {
-      el("profitRugi").value =
-        row.profitRugi || "";
-    }
+    /*
+     * Isi form.
+     */
 
-    if (el("nominal")) {
-      el("nominal").value =
-        row.nominal || "";
-    }
+    setInputValue(
+      "tanggal",
+      convertDateForInputFinal(
+        row.tanggal
+      )
+    );
 
-    if (el("catatan")) {
-      el("catatan").value =
-        row.catatan || "";
-    }
+
+    setInputValue(
+      "saham",
+      row.saham
+    );
+
+
+    setInputValue(
+      "aksi",
+      row.aksi
+    );
+
+
+    setInputValue(
+      "harga",
+      row.harga
+    );
+
+
+    setInputValue(
+      "lot",
+      row.lot
+    );
+
+
+    setInputValue(
+      "profitRugi",
+      row.profitRugi
+    );
+
+
+    setInputValue(
+      "nominal",
+      row.nominal
+    );
+
+
+    setInputValue(
+      "catatan",
+      row.catatan
+    );
+
 
     updateNominalVisibility();
 
-    setTransactionEditMode(true);
+
+    setTransactionEditModeFinal(
+      true
+    );
+
+
+    updateCancelEditButtonFinal();
+
 
     const form =
-      el("transactionForm");
+      document.getElementById(
+        "transactionForm"
+      );
+
 
     if (form) {
 
@@ -3908,27 +2193,34 @@ async function startEditTransaction(id) {
 
     }
 
+
     showToast(
-      "Data transaksi dimuat untuk diedit.",
-      "success"
+      "success",
+      "Mode Edit",
+      "Data transaksi dimuat. Silakan ubah lalu tekan Update Transaksi."
     );
+
 
   } catch (error) {
 
     console.error(
-      "[Trading] edit:",
+      "[Trading] Start edit error:",
       error
     );
 
+
     showToast(
-      error.message ||
-      "Gagal memuat transaksi.",
-      "error"
+      "error",
+      "Gagal",
+      getErrorMessage(error)
     );
+
 
   } finally {
 
-    hideLoading();
+    setLoading(
+      false
+    );
 
   }
 
@@ -3936,29 +2228,38 @@ async function startEditTransaction(id) {
 
 
 /* =========================================================
-   CONVERT DATE FOR INPUT
+   CONVERT DATE
 ========================================================= */
 
-function convertDateForInput(value) {
+function convertDateForInputFinal(
+  value
+) {
 
   if (!value) {
+
     return "";
+
   }
+
 
   const text =
     String(value).trim();
 
+
   /*
-   * Sudah YYYY-MM-DD
+   * Sudah benar.
    */
 
   if (
-    /^\d{4}-\d{2}-\d{2}$/.test(text)
+    /^\d{4}-\d{2}-\d{2}$/.test(
+      text
+    )
   ) {
 
     return text;
 
   }
+
 
   /*
    * DD/MM/YYYY
@@ -3968,6 +2269,7 @@ function convertDateForInput(value) {
     text.match(
       /^(\d{2})\/(\d{2})\/(\d{4})$/
     );
+
 
   if (match) {
 
@@ -3981,23 +2283,42 @@ function convertDateForInput(value) {
 
   }
 
+
+  /*
+   * Format tanggal lainnya.
+   */
+
   const date =
     new Date(text);
 
-  if (isNaN(date.getTime())) {
+
+  if (
+    isNaN(
+      date.getTime()
+    )
+  ) {
+
     return "";
+
   }
+
 
   return (
     date.getFullYear() +
     "-" +
     String(
       date.getMonth() + 1
-    ).padStart(2, "0") +
+    ).padStart(
+      2,
+      "0"
+    ) +
     "-" +
     String(
       date.getDate()
-    ).padStart(2, "0")
+    ).padStart(
+      2,
+      "0"
+    )
   );
 
 }
@@ -4007,96 +2328,367 @@ function convertDateForInput(value) {
    CANCEL EDIT
 ========================================================= */
 
-function cancelEditTransaction() {
+function cancelEditTransactionFinal() {
 
-  editingTransactionId = null;
+  TradingState.editingId =
+    null;
 
-  clearTransactionForm();
 
-  setTransactionEditMode(false);
+  resetTransactionForm();
+
+
+  setTransactionEditModeFinal(
+    false
+  );
+
+
+  updateCancelEditButtonFinal();
+
 
   showToast(
-    "Edit transaksi dibatalkan.",
-    "success"
+    "success",
+    "Edit Dibatalkan",
+    "Form transaksi kembali ke mode tambah."
   );
 
 }
 
 
 /* =========================================================
-   DELETE CONFIRM
+   SAVE TRANSACTION
+   FIX UTAMA
 ========================================================= */
 
-async function handleDeleteTransaction(id) {
+async function saveTransactionFinal(
+  form
+) {
 
-  if (!id) {
+  /*
+   * Validasi HTML.
+   */
 
-    showToast(
-      "ID transaksi tidak ditemukan.",
-      "error"
-    );
+  if (
+    form &&
+    !form.checkValidity()
+  ) {
+
+    form.reportValidity();
 
     return;
 
   }
 
-  const confirmed =
-    window.confirm(
-      "Hapus transaksi ini?\n\nData yang sudah dihapus tidak dapat dikembalikan."
+
+  const button =
+    document.getElementById(
+      "saveTransactionButton"
     );
 
-  if (!confirmed) {
-    return;
-  }
+
+  const data =
+    getTransactionFormDataFinal();
+
+
+  /*
+   * =====================================================
+   * AMBIL ID DARI SATU STATE SAJA
+   * =====================================================
+   */
+
+  const editingId =
+    TradingState.editingId
+      ? String(
+          TradingState.editingId
+        ).trim()
+      : "";
+
+
+  console.log(
+    "[Trading] save transaction:",
+    {
+      editingId:
+        editingId || null,
+      data:
+        data
+    }
+  );
+
 
   try {
 
-    showLoading(
-      "Menghapus transaksi..."
+    setButtonLoading(
+      button,
+      true,
+      editingId
+        ? "Mengupdate..."
+        : "Menyimpan..."
     );
 
-    const result =
-      await TradingAPI.deleteTransaction(
-        id
+
+    let result;
+
+
+    /*
+     * =====================================================
+     * EDIT
+     * =====================================================
+     */
+
+    if (editingId) {
+
+      console.log(
+        "[Trading] UPDATE TRANSACTION ID:",
+        editingId
       );
 
-    if (
-      String(editingTransactionId) ===
-      String(id)
-    ) {
 
-      editingTransactionId = null;
+      /*
+       * ID DIKIRIM SEBAGAI ARGUMEN PERTAMA.
+       */
 
-      clearTransactionForm();
+      result =
+        await TradingAPI.updateTransaction(
+          editingId,
+          data
+        );
 
-      setTransactionEditMode(false);
+
+      showToast(
+        "success",
+        "Berhasil",
+        result?.message ||
+        "Transaksi berhasil diperbarui."
+      );
+
 
     }
 
-    await loadTransactions();
 
-    showToast(
-      result?.message ||
-      "Transaksi berhasil dihapus.",
-      "success"
+    /*
+     * =====================================================
+     * TAMBAH
+     * =====================================================
+     */
+
+    else {
+
+      console.log(
+        "[Trading] ADD TRANSACTION"
+      );
+
+
+      result =
+        await TradingAPI.addTransaction(
+          data
+        );
+
+
+      showToast(
+        "success",
+        "Berhasil",
+        result?.message ||
+        "Transaksi berhasil disimpan."
+      );
+
+    }
+
+
+    /*
+     * Reset state edit.
+     */
+
+    TradingState.editingId =
+      null;
+
+
+    resetTransactionForm();
+
+
+    setTransactionEditModeFinal(
+      false
     );
+
+
+    updateCancelEditButtonFinal();
+
+
+    /*
+     * Reload data.
+     */
+
+    await loadTransactionsFinal();
+
 
   } catch (error) {
 
     console.error(
-      "[Trading] delete:",
+      "[Trading] Save transaction error:",
       error
     );
 
+
     showToast(
-      error.message ||
-      "Gagal menghapus transaksi.",
-      "error"
+      "error",
+      "Gagal",
+      getErrorMessage(error)
     );
+
 
   } finally {
 
-    hideLoading();
+    setButtonLoading(
+      button,
+      false,
+      "Simpan Transaksi"
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   DELETE TRANSACTION
+========================================================= */
+
+async function deleteTransactionFinal(
+  id
+) {
+
+  if (!id) {
+
+    showToast(
+      "error",
+      "Gagal",
+      "ID transaksi tidak ditemukan."
+    );
+
+    return;
+
+  }
+
+
+  const transaction =
+    Array.isArray(
+      TradingState.transaksi
+    )
+      ? TradingState.transaksi.find(
+          function (item) {
+
+            return (
+              String(
+                getTransactionId(
+                  item
+                )
+              ) ===
+              String(id)
+            );
+
+          }
+        )
+      : null;
+
+
+  const saham =
+    transaction
+      ? getField(
+          transaction,
+          "Saham",
+          "saham"
+        )
+      : "transaksi ini";
+
+
+  const confirmed =
+    window.confirm(
+      "Hapus transaksi " +
+      saham +
+      "?\n\nData yang dihapus tidak dapat dikembalikan."
+    );
+
+
+  if (!confirmed) {
+
+    return;
+
+  }
+
+
+  try {
+
+    setLoading(
+      true,
+      "Menghapus transaksi..."
+    );
+
+
+    const result =
+      await TradingAPI.deleteTransaction(
+        String(id)
+      );
+
+
+    /*
+     * Kalau transaksi yang sedang diedit
+     * ikut dihapus, keluar dari mode edit.
+     */
+
+    if (
+      TradingState.editingId &&
+      String(
+        TradingState.editingId
+      ) ===
+      String(id)
+    ) {
+
+      TradingState.editingId =
+        null;
+
+
+      resetTransactionForm();
+
+
+      setTransactionEditModeFinal(
+        false
+      );
+
+
+      updateCancelEditButtonFinal();
+
+    }
+
+
+    showToast(
+      "success",
+      "Berhasil",
+      result?.message ||
+      "Transaksi berhasil dihapus."
+    );
+
+
+    await loadTransactionsFinal();
+
+
+  } catch (error) {
+
+    console.error(
+      "[Trading] Delete error:",
+      error
+    );
+
+
+    showToast(
+      "error",
+      "Gagal",
+      getErrorMessage(error)
+    );
+
+
+  } finally {
+
+    setLoading(
+      false
+    );
 
   }
 
@@ -4107,34 +2699,64 @@ async function handleDeleteTransaction(id) {
    TABLE ACTION
 ========================================================= */
 
-function handleTableClick(event) {
+function handleTransactionTableClickFinal(
+  event
+) {
 
   const button =
     event.target.closest(
       "[data-action]"
     );
 
+
   if (!button) {
+
     return;
+
   }
+
 
   const action =
     button.dataset.action;
 
+
   const id =
     button.dataset.id;
 
-  if (action === "edit") {
 
-    startEditTransaction(id);
+  if (!id) {
+
+    showToast(
+      "error",
+      "Gagal",
+      "ID transaksi tidak ditemukan."
+    );
 
     return;
 
   }
 
-  if (action === "delete") {
 
-    handleDeleteTransaction(id);
+  if (
+    action === "edit"
+  ) {
+
+    startEditTransactionFinal(
+      id
+    );
+
+    return;
+
+  }
+
+
+  if (
+    action === "delete"
+  ) {
+
+    deleteTransactionFinal(
+      id
+    );
 
   }
 
@@ -4142,56 +2764,73 @@ function handleTableClick(event) {
 
 
 /* =========================================================
-   ADD MODAL FORM
+   ADD CAPITAL
 ========================================================= */
 
-async function handleAddModalSubmit(event) {
-
-  event.preventDefault();
+async function handleAddCapitalFinal(
+  form
+) {
 
   const tanggal =
-    el("addModalTanggal")?.value ||
-    todayString();
-
-  const nominal =
-    Number(
-      el("addModalNominal")?.value || 0
+    getInputValue(
+      "addModalTanggal"
     );
 
+
+  const nominal =
+    getInputNumber(
+      "addModalNominal"
+    );
+
+
   const catatan =
-    el("addModalCatatan")?.value ||
-    "";
+    getInputValue(
+      "addModalCatatan"
+    );
+
 
   if (!tanggal) {
 
     showToast(
-      "Tanggal modal wajib diisi.",
-      "error"
+      "error",
+      "Gagal",
+      "Tanggal modal wajib diisi."
     );
 
     return;
 
   }
 
+
   if (
-    !Number.isFinite(nominal) ||
     nominal <= 0
   ) {
 
     showToast(
-      "Nominal tambah modal harus lebih dari 0.",
-      "error"
+      "error",
+      "Gagal",
+      "Nominal tambah modal harus lebih dari 0."
     );
 
     return;
 
   }
 
+
+  const button =
+    document.getElementById(
+      "saveAddModalButton"
+    );
+
+
   try {
 
-    showLoading(
-      "Menambahkan modal..."
+    setButtonLoading(
+      button,
+      true,
+      "Menyimpan..."
     );
+
 
     const result =
       await TradingAPI.addCapital(
@@ -4200,44 +2839,58 @@ async function handleAddModalSubmit(event) {
         tanggal
       );
 
-    const form =
-      el("addModalForm");
 
     if (form) {
+
       form.reset();
+
     }
 
-    if (el("addModalTanggal")) {
-      el("addModalTanggal").value =
-        todayString();
-    }
 
-    closeModal("addModal");
+    setInputValue(
+      "addModalTanggal",
+      todayStringFinal()
+    );
 
-    await loadTransactions();
+
+    closeModal(
+      "addModal"
+    );
+
 
     showToast(
+      "success",
+      "Berhasil",
       result?.message ||
-      "Modal berhasil ditambahkan.",
-      "success"
+      "Modal berhasil ditambahkan."
     );
+
+
+    await loadTransactionsFinal();
+
 
   } catch (error) {
 
     console.error(
-      "[Trading] add capital:",
+      "[Trading] Add capital error:",
       error
     );
 
+
     showToast(
-      error.message ||
-      "Gagal menambahkan modal.",
-      "error"
+      "error",
+      "Gagal",
+      getErrorMessage(error)
     );
+
 
   } finally {
 
-    hideLoading();
+    setButtonLoading(
+      button,
+      false,
+      "Simpan"
+    );
 
   }
 
@@ -4245,56 +2898,73 @@ async function handleAddModalSubmit(event) {
 
 
 /* =========================================================
-   WITHDRAW MODAL FORM
+   WITHDRAW CAPITAL
 ========================================================= */
 
-async function handleWithdrawModalSubmit(event) {
-
-  event.preventDefault();
+async function handleWithdrawCapitalFinal(
+  form
+) {
 
   const tanggal =
-    el("withdrawModalTanggal")?.value ||
-    todayString();
-
-  const nominal =
-    Number(
-      el("withdrawModalNominal")?.value || 0
+    getInputValue(
+      "withdrawModalTanggal"
     );
 
+
+  const nominal =
+    getInputNumber(
+      "withdrawModalNominal"
+    );
+
+
   const catatan =
-    el("withdrawModalCatatan")?.value ||
-    "";
+    getInputValue(
+      "withdrawModalCatatan"
+    );
+
 
   if (!tanggal) {
 
     showToast(
-      "Tanggal penarikan wajib diisi.",
-      "error"
+      "error",
+      "Gagal",
+      "Tanggal penarikan wajib diisi."
     );
 
     return;
 
   }
 
+
   if (
-    !Number.isFinite(nominal) ||
     nominal <= 0
   ) {
 
     showToast(
-      "Nominal penarikan harus lebih dari 0.",
-      "error"
+      "error",
+      "Gagal",
+      "Nominal penarikan harus lebih dari 0."
     );
 
     return;
 
   }
 
+
+  const button =
+    document.getElementById(
+      "saveWithdrawModalButton"
+    );
+
+
   try {
 
-    showLoading(
-      "Menarik modal..."
+    setButtonLoading(
+      button,
+      true,
+      "Memproses..."
     );
+
 
     const result =
       await TradingAPI.withdrawCapital(
@@ -4303,44 +2973,58 @@ async function handleWithdrawModalSubmit(event) {
         tanggal
       );
 
-    const form =
-      el("withdrawModalForm");
 
     if (form) {
+
       form.reset();
+
     }
 
-    if (el("withdrawModalTanggal")) {
-      el("withdrawModalTanggal").value =
-        todayString();
-    }
 
-    closeModal("withdrawModal");
+    setInputValue(
+      "withdrawModalTanggal",
+      todayStringFinal()
+    );
 
-    await loadTransactions();
+
+    closeModal(
+      "withdrawModal"
+    );
+
 
     showToast(
+      "success",
+      "Berhasil",
       result?.message ||
-      "Modal berhasil ditarik.",
-      "success"
+      "Modal berhasil ditarik."
     );
+
+
+    await loadTransactionsFinal();
+
 
   } catch (error) {
 
     console.error(
-      "[Trading] withdraw capital:",
+      "[Trading] Withdraw capital error:",
       error
     );
 
+
     showToast(
-      error.message ||
-      "Gagal menarik modal.",
-      "error"
+      "error",
+      "Gagal",
+      getErrorMessage(error)
     );
+
 
   } finally {
 
-    hideLoading();
+    setButtonLoading(
+      button,
+      false,
+      "Tarik Modal"
+    );
 
   }
 
@@ -4348,282 +3032,143 @@ async function handleWithdrawModalSubmit(event) {
 
 
 /* =========================================================
-   OPEN ADD MODAL
+   OPEN ADD CAPITAL
 ========================================================= */
 
-function openAddCapitalModal() {
+function openAddCapitalModalFinal() {
 
   const form =
-    el("addModalForm");
+    document.getElementById(
+      "addModalForm"
+    );
+
 
   if (form) {
+
     form.reset();
-  }
-
-  if (el("addModalTanggal")) {
-    el("addModalTanggal").value =
-      todayString();
-  }
-
-  openModal("addModal");
-
-}
-
-
-/* =========================================================
-   OPEN WITHDRAW MODAL
-========================================================= */
-
-function openWithdrawCapitalModal() {
-
-  const form =
-    el("withdrawModalForm");
-
-  if (form) {
-    form.reset();
-  }
-
-  if (el("withdrawModalTanggal")) {
-    el("withdrawModalTanggal").value =
-      todayString();
-  }
-
-  openModal("withdrawModal");
-
-}
-
-
-/* =========================================================
-   MODAL BACKDROP
-========================================================= */
-
-function handleModalOverlayClick(event) {
-
-  if (
-    event.target.classList.contains(
-      "modal-overlay"
-    )
-  ) {
-
-    event.target.classList.add(
-      "hidden"
-    );
-
-    document.body.classList.remove(
-      "modal-open"
-    );
-
-  }
-
-}
-
-
-/* =========================================================
-   KEYBOARD ESC
-========================================================= */
-
-function handleKeyboard(event) {
-
-  if (event.key !== "Escape") {
-    return;
-  }
-
-  closeAllModals();
-
-}
-
-
-/* =========================================================
-   BUTTON EVENT SETUP
-========================================================= */
-
-function setupButtons() {
-
-  const addButton =
-    el("addModalButton");
-
-  if (addButton) {
-
-    addButton.addEventListener(
-      "click",
-      openAddCapitalModal
-    );
 
   }
 
 
-  const withdrawButton =
-    el("withdrawModalButton");
-
-  if (withdrawButton) {
-
-    withdrawButton.addEventListener(
-      "click",
-      openWithdrawCapitalModal
-    );
-
-  }
+  setInputValue(
+    "addModalTanggal",
+    todayStringFinal()
+  );
 
 
-  const transactionForm =
-    el("transactionForm");
-
-  if (transactionForm) {
-
-    transactionForm.addEventListener(
-      "submit",
-      handleTransactionSubmit
-    );
-
-  }
-
-
-  const addForm =
-    el("addModalForm");
-
-  if (addForm) {
-
-    addForm.addEventListener(
-      "submit",
-      handleAddModalSubmit
-    );
-
-  }
-
-
-  const withdrawForm =
-    el("withdrawModalForm");
-
-  if (withdrawForm) {
-
-    withdrawForm.addEventListener(
-      "submit",
-      handleWithdrawModalSubmit
-    );
-
-  }
-
-
-  const tableBody =
-    el("transactionTableBody");
-
-  if (tableBody) {
-
-    tableBody.addEventListener(
-      "click",
-      handleTableClick
-    );
-
-  }
-
-
-  const profitRugi =
-    el("profitRugi");
-
-  if (profitRugi) {
-
-    profitRugi.addEventListener(
-      "change",
-      updateNominalVisibility
-    );
-
-  }
-
-
-  /*
-   * Tombol tutup modal
-   */
-
-  document
-    .querySelectorAll(
-      "[data-close-modal]"
-    )
-    .forEach(
-      function(button) {
-
-        button.addEventListener(
-          "click",
-          function() {
-
-            closeAllModals();
-
-          }
-        );
-
-      }
-    );
-
-
-  /*
-   * Klik backdrop
-   */
-
-  document
-    .querySelectorAll(
-      ".modal-overlay"
-    )
-    .forEach(
-      function(modal) {
-
-        modal.addEventListener(
-          "click",
-          handleModalOverlayClick
-        );
-
-      }
-    );
-
-
-  document.addEventListener(
-    "keydown",
-    handleKeyboard
+  openModal(
+    "addModal"
   );
 
 }
 
 
 /* =========================================================
-   ADD CANCEL EDIT BUTTON
-   Dibuat otomatis jika HTML belum punya.
+   OPEN WITHDRAW CAPITAL
 ========================================================= */
 
-function createCancelEditButton() {
+function openWithdrawCapitalModalFinal() {
 
   const form =
-    el("transactionForm");
+    document.getElementById(
+      "withdrawModalForm"
+    );
+
+
+  if (form) {
+
+    form.reset();
+
+  }
+
+
+  setInputValue(
+    "withdrawModalTanggal",
+    todayStringFinal()
+  );
+
+
+  openModal(
+    "withdrawModal"
+  );
+
+}
+
+
+/* =========================================================
+   CANCEL BUTTON
+========================================================= */
+
+function createCancelEditButtonFinal() {
+
+  const form =
+    document.getElementById(
+      "transactionForm"
+    );
+
 
   const saveButton =
-    el("saveTransactionButton");
+    document.getElementById(
+      "saveTransactionButton"
+    );
 
-  if (!form || !saveButton) {
-    return;
-  }
 
   if (
-    el("cancelEditButton")
+    !form ||
+    !saveButton
   ) {
+
     return;
+
   }
 
-  const button =
-    document.createElement("button");
 
-  button.type = "button";
-  button.id = "cancelEditButton";
-  button.className = "secondary-button";
-  button.textContent = "Batal Edit";
-  button.style.display = "none";
+  if (
+    document.getElementById(
+      "cancelEditButton"
+    )
+  ) {
+
+    return;
+
+  }
+
+
+  const button =
+    document.createElement(
+      "button"
+    );
+
+
+  button.type =
+    "button";
+
+
+  button.id =
+    "cancelEditButton";
+
+
+  button.className =
+    "secondary-button";
+
+
+  button.textContent =
+    "Batal Edit";
+
+
+  button.style.display =
+    "none";
+
 
   button.addEventListener(
     "click",
-    function() {
+    function () {
 
-      cancelEditTransaction();
-
-      button.style.display = "none";
+      cancelEditTransactionFinal();
 
     }
   );
+
 
   saveButton.parentNode.insertBefore(
     button,
@@ -4634,20 +3179,26 @@ function createCancelEditButton() {
 
 
 /* =========================================================
-   UPDATE EDIT BUTTON STATE
+   UPDATE CANCEL BUTTON
 ========================================================= */
 
-function updateCancelEditButton() {
+function updateCancelEditButtonFinal() {
 
   const button =
-    el("cancelEditButton");
+    document.getElementById(
+      "cancelEditButton"
+    );
+
 
   if (!button) {
+
     return;
+
   }
 
+
   button.style.display =
-    editingTransactionId
+    TradingState.editingId
       ? "block"
       : "none";
 
@@ -4655,96 +3206,302 @@ function updateCancelEditButton() {
 
 
 /* =========================================================
-   WATCH EDIT STATE
+   MODAL BACKDROP
 ========================================================= */
 
-function setEditState() {
+function handleModalOverlayClickFinal(
+  event
+) {
 
-  const original =
-    setTransactionEditMode;
+  const overlay =
+    event.currentTarget;
 
-  /*
-   * Tidak mengganti fungsi asli.
-   * State tombol diperbarui setelah interval kecil.
-   */
 
-  setInterval(
-    updateCancelEditButton,
-    300
-  );
+  if (
+    event.target ===
+    overlay
+  ) {
+
+    closeModal(
+      overlay.id
+    );
+
+  }
 
 }
 
 
 /* =========================================================
-   REFRESH DATA
+   KEYBOARD
 ========================================================= */
 
-async function refreshTradingData() {
+function handleKeyboardFinal(
+  event
+) {
+
+  if (
+    event.key ===
+    "Escape"
+  ) {
+
+    closeAllModals();
+
+  }
+
+}
+
+
+/* =========================================================
+   SETUP STAGE 2
+========================================================= */
+
+function setupTradingStage2Final() {
+
+  /*
+   * =====================================================
+   * JANGAN PASANG SUBMIT LISTENER LAGI.
+   *
+   * Stage 1 sudah memasangnya.
+   *
+   * Kita hanya override fungsi submit yang dipakai
+   * apabila dipanggil secara langsung.
+   * =====================================================
+   */
+
+
+  /*
+   * TABLE
+   */
+
+  const tableBody =
+    document.getElementById(
+      "transactionTableBody"
+    );
+
+
+  if (tableBody) {
+
+    /*
+     * Stage 1 sudah punya listener edit/delete
+     * langsung di masing-masing button.
+     *
+     * Jadi jangan tambah listener table lagi.
+     */
+
+  }
+
+
+  /*
+   * Tombol tambah modal.
+   */
+
+  const addButton =
+    document.getElementById(
+      "addModalButton"
+    );
+
+
+  if (
+    addButton &&
+    !addButton.dataset.stage2Bound
+  ) {
+
+    addButton.dataset.stage2Bound =
+      "true";
+
+
+    addButton.addEventListener(
+      "click",
+      function () {
+
+        openAddCapitalModalFinal();
+
+      }
+    );
+
+  }
+
+
+  /*
+   * Tombol tarik modal.
+   */
+
+  const withdrawButton =
+    document.getElementById(
+      "withdrawModalButton"
+    );
+
+
+  if (
+    withdrawButton &&
+    !withdrawButton.dataset.stage2Bound
+  ) {
+
+    withdrawButton.dataset.stage2Bound =
+      "true";
+
+
+    withdrawButton.addEventListener(
+      "click",
+      function () {
+
+        openWithdrawCapitalModalFinal();
+
+      }
+    );
+
+  }
+
+
+  /*
+   * Tombol close.
+   */
+
+  document
+    .querySelectorAll(
+      "[data-close-modal]"
+    )
+    .forEach(
+      function (button) {
+
+        if (
+          button.dataset.stage2Bound
+        ) {
+
+          return;
+
+        }
+
+
+        button.dataset.stage2Bound =
+          "true";
+
+
+        button.addEventListener(
+          "click",
+          function () {
+
+            const modal =
+              button.closest(
+                ".modal-overlay"
+              );
+
+
+            if (modal) {
+
+              closeModal(
+                modal.id
+              );
+
+            }
+
+          }
+        );
+
+      }
+    );
+
+
+  /*
+   * Backdrop modal.
+   */
+
+  document
+    .querySelectorAll(
+      ".modal-overlay"
+    )
+    .forEach(
+      function (modal) {
+
+        if (
+          modal.dataset.stage2Bound
+        ) {
+
+          return;
+
+        }
+
+
+        modal.dataset.stage2Bound =
+          "true";
+
+
+        modal.addEventListener(
+          "click",
+          handleModalOverlayClickFinal
+        );
+
+      }
+    );
+
+
+  /*
+   * ESC.
+   */
+
+  if (
+    !document.body.dataset.tradingKeyboardBound
+  ) {
+
+    document.body.dataset.tradingKeyboardBound =
+      "true";
+
+
+    document.addEventListener(
+      "keydown",
+      handleKeyboardFinal
+    );
+
+  }
+
+
+  /*
+   * Cancel edit.
+   */
+
+  createCancelEditButtonFinal();
+
+  updateCancelEditButtonFinal();
+
+}
+
+
+/* =========================================================
+   REFRESH
+========================================================= */
+
+async function refreshTradingDataFinal() {
 
   try {
 
-    showLoading(
+    setLoading(
+      true,
       "Memuat data terbaru..."
     );
 
-    await loadTransactions();
+
+    await loadTransactionsFinal();
+
 
   } catch (error) {
 
     console.error(
-      "[Trading] refresh:",
+      "[Trading] Refresh error:",
       error
     );
+
+
+    showToast(
+      "error",
+      "Gagal",
+      getErrorMessage(error)
+    );
+
 
   } finally {
 
-    hideLoading();
-
-  }
-
-}
-
-
-/* =========================================================
-   INITIALIZE
-========================================================= */
-
-async function initTrading() {
-
-  console.log(
-    "[Trading] Initializing..."
-  );
-
-  try {
-
-    setupButtons();
-
-    createCancelEditButton();
-
-    setDefaultDates();
-
-    updateNominalVisibility();
-
-    setEditState();
-
-    await loadTransactions();
-
-    console.log(
-      "[Trading] Ready."
-    );
-
-  } catch (error) {
-
-    console.error(
-      "[Trading] INIT ERROR:",
-      error
-    );
-
-    showToast(
-      error.message ||
-      "Gagal menjalankan Trading Journal.",
-      "error"
+    setLoading(
+      false
     );
 
   }
@@ -4753,40 +3510,111 @@ async function initTrading() {
 
 
 /* =========================================================
-   GLOBAL FUNCTIONS
+   OVERRIDE SUBMIT
 ========================================================= */
 
-window.TradingPage = {
+/*
+ * Karena Stage 1 sudah memasang listener submit,
+ * kita tidak menambahkan listener baru.
+ *
+ * Kita mengganti fungsi global yang bisa dipanggil
+ * oleh bagian lain.
+ */
 
-  init:
-    initTrading,
+window.saveTradingTransaction =
+  function () {
+
+    const form =
+      document.getElementById(
+        "transactionForm"
+      );
+
+
+    if (form) {
+
+      return saveTransactionFinal(
+        form
+      );
+
+    }
+
+  };
+
+
+/* =========================================================
+   GLOBAL FINAL API
+========================================================= */
+
+window.TradingPageStage2 = {
+
+  load:
+    loadTransactionsFinal,
 
   refresh:
-    refreshTradingData,
+    refreshTradingDataFinal,
 
   edit:
-    startEditTransaction,
+    startEditTransactionFinal,
 
   delete:
-    handleDeleteTransaction,
+    deleteTransactionFinal,
+
+  cancelEdit:
+    cancelEditTransactionFinal,
 
   addCapital:
-    openAddCapitalModal,
+    openAddCapitalModalFinal,
 
   withdrawCapital:
-    openWithdrawCapitalModal,
-
-  closeModals:
-    closeAllModals,
-
-  toast:
-    showToast
+    openWithdrawCapitalModalFinal
 
 };
 
 
 /* =========================================================
-   START
+   INITIALIZE STAGE 2
+========================================================= */
+
+function initTradingStage2Final() {
+
+  console.log(
+    "[Trading] Stage 2 initializing..."
+  );
+
+
+  /*
+   * Pastikan state edit menggunakan state Stage 1.
+   */
+
+  if (
+    typeof TradingState !== "undefined"
+  ) {
+
+    if (
+      TradingState.editingId ===
+      undefined
+    ) {
+
+      TradingState.editingId =
+        null;
+
+    }
+
+  }
+
+
+  setupTradingStage2Final();
+
+
+  console.log(
+    "[Trading] Stage 2 ready."
+  );
+
+}
+
+
+/* =========================================================
+   START STAGE 2
 ========================================================= */
 
 if (
@@ -4796,20 +3624,24 @@ if (
 
   document.addEventListener(
     "DOMContentLoaded",
-    initTrading
+    initTradingStage2Final
   );
 
 } else {
 
-  initTrading();
+  initTradingStage2Final();
 
 }
 
 
+/* =========================================================
+   FINAL LOG
+========================================================= */
+
 console.log(
-  "[Trading] trading.js Stage 2 loaded."
+  "[Trading] Stage 2 FIX loaded."
 );
 
 console.log(
-  "[Trading] ADD + EDIT + DELETE + MODAL enabled."
+  "[Trading] ADD + EDIT + DELETE + MODAL + REFRESH enabled."
 );
